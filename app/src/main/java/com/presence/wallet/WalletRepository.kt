@@ -2,9 +2,6 @@ package com.presence.wallet
 
 import android.content.SharedPreferences
 import android.net.Uri
-import com.presence.BuildConfig
-import com.solana.mobilewalletadapter.clientlib.AdapterOperations
-import com.solana.mobilewalletadapter.clientlib.RpcCluster
 import com.funkatronics.encoders.Base58
 import com.presence.attest.AttestException
 import com.solana.mobilewalletadapter.clientlib.ActivityResultSender
@@ -16,11 +13,11 @@ import javax.inject.Singleton
 
 data class WalletAccount(val address: String, val label: String)
 
-/** How CLOCK IN introduces itself to the wallet. The domain matches the server's sign-in domain. */
+/** How FACEDOWN introduces itself to the wallet. The domain matches the server's sign-in domain. */
 object WalletIdentity {
     val uri: Uri = Uri.parse("https://presence.local")
     val icon: Uri = Uri.parse("favicon.ico")
-    const val name = "CLOCK IN"
+    const val name = "FACEDOWN"
 }
 
 /**
@@ -62,9 +59,7 @@ class WalletRepository @Inject constructor(
     suspend fun signMessage(sender: ActivityResultSender, message: String): ByteArray {
         val current = account ?: throw AttestException("WALLET_NOT_CONNECTED")
         val address = Base58.decode(current.address)
-        freshAuthorization()
         val result = adapter.transact(sender) {
-            declareCluster()
             signMessagesDetached(arrayOf(message.toByteArray()), arrayOf(address))
         }
         return when (result) {
@@ -84,9 +79,7 @@ class WalletRepository @Inject constructor(
     suspend fun signSession(sender: ActivityResultSender, message: String, stakeTx: ByteArray?): Pair<ByteArray, ByteArray?> {
         val current = account ?: throw AttestException("WALLET_NOT_CONNECTED")
         val address = Base58.decode(current.address)
-        freshAuthorization()
         val result = adapter.transact(sender) {
-            declareCluster()
             val signed = signMessagesDetached(arrayOf(message.toByteArray()), arrayOf(address))
             val stake = stakeTx?.let { signTransactions(arrayOf(it)) }
             Pair(signed, stake)
@@ -103,27 +96,6 @@ class WalletRepository @Inject constructor(
             is TransactionResult.NoWalletFound -> throw AttestException("WALLET_NOT_FOUND")
             is TransactionResult.Failure -> throw AttestException("WALLET_REJECTED", result.e.message ?: "")
         }
-    }
-
-    /**
-     * Wallets on the legacy MWA protocol (Solflare today) get a plain `reauthorize` when we hold an auth
-     * token, and that call carries no cluster, so they assume mainnet and refuse our devnet stake
-     * ("Network mismatch"). Without a token the library sends `authorize` with the cluster every time;
-     * the wallet re-approves an app it already trusts without asking.
-     */
-    private fun freshAuthorization() {
-        adapter.authToken = null
-    }
-
-    /**
-     * Solflare 2.30 reads only the legacy `cluster` field, not MWA 2.0's `chain`, so off mainnet it
-     * refuses our devnet stake ("Network mismatch"). Authorizing again in the same session with the
-     * legacy field set tells it. Mainnet is every wallet's default, so mainnet builds skip this.
-     */
-    private suspend fun AdapterOperations.declareCluster() {
-        if (BuildConfig.NETWORK == "mainnet") return
-        @Suppress("DEPRECATION")
-        runCatching { authorize(WalletIdentity.uri, WalletIdentity.icon, WalletIdentity.name, RpcCluster.Devnet) }
     }
 
     fun disconnect() {

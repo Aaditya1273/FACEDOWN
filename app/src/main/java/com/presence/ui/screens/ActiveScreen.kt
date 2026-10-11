@@ -1,15 +1,21 @@
 package com.presence.ui.screens
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import android.os.VibrationEffect
 import android.os.Vibrator
+import android.view.WindowManager
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
@@ -20,9 +26,11 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -42,22 +50,46 @@ import com.presence.ui.theme.LocalReducedMotion
 import com.presence.ui.theme.Motion
 import com.presence.ui.theme.SemanticColors
 
-/** The quietest screen: a timer, one line of status, and a check-in button only when one is due. */
+/**
+ * Face-down: the screen goes black at minimum brightness, so the phone is dark on the table while the
+ * session (and the foreground evidence) keeps running. A buzz asks for a check-in; a knock on the back
+ * answers it. Picked up, the phone shows the timer and an "I'm here" button instead.
+ */
 @Composable
-fun ActiveScreen(a: Screen.Active, onPulse: () -> Unit) = Page {
+fun ActiveScreen(a: Screen.Active, onPulse: () -> Unit, onBuzz: () -> Unit) {
     val view = LocalView.current
     val context = LocalContext.current
-    // The phone sits face-up on the desk: keep the screen (and so the session) alive.
     DisposableEffect(Unit) {
-        view.keepScreenOn = true
+        view.keepScreenOn = true // the app must stay in front; face-down it is black and dimmed
         onDispose { view.keepScreenOn = false }
     }
-    // One buzz per check-in: that's how a phone-down user knows to look. No other haptics.
-    LaunchedEffect(a.promptVisible) {
-        if (a.promptVisible) context.getSystemService(Vibrator::class.java)?.vibrate(
-            VibrationEffect.createWaveform(longArrayOf(0, 180, 120, 180), -1))
+    val dark = a.faceDown && !a.leftForeground
+    DisposableEffect(dark) {
+        val window = context.findActivity()?.window
+        window?.attributes = window?.attributes?.apply {
+            screenBrightness = if (dark) 0.01f else WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+        }
+        onDispose {
+            window?.attributes = window?.attributes?.apply {
+                screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+            }
+        }
     }
+    // One buzz per check-in: that's how a face-down user knows to knock. No other haptics.
+    LaunchedEffect(a.promptVisible) {
+        if (a.promptVisible) {
+            onBuzz()
+            context.getSystemService(Vibrator::class.java)?.vibrate(
+                VibrationEffect.createWaveform(longArrayOf(0, 180, 120, 180), -1))
+        }
+    }
+    if (dark) Box(Modifier.fillMaxSize().background(Color.Black).semantics {
+        contentDescription = "Facedown. The session is running."
+    }) else Visible(a, onPulse)
+}
 
+@Composable
+private fun Visible(a: Screen.Active, onPulse: () -> Unit) = Page {
     TopBar {
         if (a.leftForeground) StatusLabel("Session interrupted") else StatusLabel("Session active", accent = true)
     }
@@ -71,8 +103,8 @@ fun ActiveScreen(a: Screen.Active, onPulse: () -> Unit) = Page {
     Text(
         when {
             a.leftForeground -> "You left the app, so this session can't be verified."
-            a.confirmedThisWindow -> "Checked in. Phone down until the next buzz."
-            else -> "Phone down. It buzzes when it's time to check in."
+            a.confirmedThisWindow -> "Checked in. Turn the phone face-down again."
+            else -> "Turn the phone face-down. The screen goes dark; knock on the back when it buzzes."
         },
         style = MaterialTheme.typography.bodyLarge,
         color = if (a.leftForeground) SemanticColors.PrimaryText else SemanticColors.SecondaryText,
@@ -91,7 +123,8 @@ private fun Timer(a: Screen.Active) {
         ProgressRing((a.elapsedMs.toFloat() / a.durationMs).coerceIn(0f, 1f), Modifier.size(264.dp),
             color = if (a.leftForeground) SemanticColors.Disabled else BrandColors.Green)
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("%02d:%02d".format(remaining / 60, remaining % 60),
+            Text(if (remaining >= 3600) "%d:%02d:%02d".format(remaining / 3600, remaining / 60 % 60, remaining % 60)
+                else "%02d:%02d".format(remaining / 60, remaining % 60),
                 style = MaterialTheme.typography.displayLarge, color = SemanticColors.PrimaryText)
             Text("${minutesLabel((a.durationMs / 1000).toInt())} goal",
                 style = MaterialTheme.typography.bodyMedium, color = SemanticColors.SecondaryText)
@@ -109,7 +142,8 @@ private fun CheckIn(visible: Boolean, onConfirm: () -> Unit) {
             fadeIn(tween(d)) togetherWith fadeOut(tween(d))
         }) { show ->
             if (show) Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("Still here?", style = MaterialTheme.typography.titleMedium, color = SemanticColors.PrimaryText)
+                Text("Still here? Knock on the back, or tap", style = MaterialTheme.typography.titleMedium,
+                    color = SemanticColors.PrimaryText)
                 Gap(12)
                 PrimaryButton("I'm here", onClick = onConfirm)
             } else Pip(PipMood.Still, 136.dp, entrance = true, live = true) // hops back in after each check-in
@@ -124,14 +158,20 @@ fun CountdownScreen(seconds: Int) = Page {
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         Pip(PipMood.Still, 176.dp, entrance = true, live = true)
         Gap(24)
-        Text("Put your phone down.", style = MaterialTheme.typography.headlineLarge, color = SemanticColors.PrimaryText,
-            textAlign = TextAlign.Center)
+        Text("Turn your phone face-down.", style = MaterialTheme.typography.headlineLarge,
+            color = SemanticColors.PrimaryText, textAlign = TextAlign.Center)
         Gap(8)
-        Text("Keep CLOCK IN on screen. It buzzes when it's time to check in.",
+        Text("Lay it on a table. The screen goes dark. When it buzzes, knock on the back.",
             style = MaterialTheme.typography.bodyLarge, color = SemanticColors.SecondaryText, textAlign = TextAlign.Center)
         Gap(32)
         Text("Starting in $seconds", style = MaterialTheme.typography.labelMedium, color = SemanticColors.TertiaryText,
             modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
     }
     Spacer(Modifier.weight(1f))
+}
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }

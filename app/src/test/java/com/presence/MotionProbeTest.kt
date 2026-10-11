@@ -2,43 +2,67 @@ package com.presence
 
 import com.presence.evidence.MotionProbe
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.random.Random
 
-/** Synthetic 100 Hz accelerometer traces: a phone on a table, a finger tap, an injected tap, a phone in hand. */
+/** Synthetic 100 Hz accelerometer traces: face-down on a table, knocks, injected taps, a phone in hand. */
 class MotionProbeTest {
     private val rnd = Random(7)
+    private val start = 1_000_000_000L
 
-    private fun MotionProbe.run(seconds: Int, tapAt: Double?, jolt: Float, handNoise: Float = 0f) {
+    /** [up] = +1 screen up, -1 face-down. A jolt of [jolt] m/s^2 lasts 3 samples at [joltAt] seconds. */
+    private fun MotionProbe.run(seconds: Int, joltAt: Double?, jolt: Float, up: Int = -1, handNoise: Float = 0f,
+                                tapAtJolt: Boolean = false) {
         for (k in 0 until seconds * 100) {
-            val ts = 1_000_000_000L + k * 10_000_000L
-            val tapping = tapAt != null && k in (tapAt * 100).toInt() until (tapAt * 100).toInt() + 3
+            val ts = start + k * 10_000_000L
+            val jolting = joltAt != null && k in (joltAt * 100).toInt() until (joltAt * 100).toInt() + 3
             val noise = (rnd.nextFloat() - 0.5f) * 0.01f + (rnd.nextFloat() - 0.5f) * handNoise
-            feed(ts, 0f, 0f, 9.81f + noise + if (tapping) jolt else 0f)
-            if (tapAt != null && k == (tapAt * 100).toInt()) onTap(ts)
+            feed(ts, 0f, 0f, up * (9.81f + noise + if (jolting) jolt else 0f))
+            if (tapAtJolt && joltAt != null && k == (joltAt * 100).toInt()) onTap(ts)
         }
     }
 
     private fun probe() = MotionProbe(null, null, measuring = true)
 
     @Test
-    fun fingerTapOnATableIsFeltAndThePhoneCountsAsStill() {
-        val (still, touch) = probe().apply { run(30, tapAt = 12.0, jolt = 0.3f) }.takeWindow()
+    fun knockOnTheBackIsDetectedAndTheFaceDownPhoneCountsAsStill() {
+        var knocks = 0
+        val p = probe().apply { onKnock = { knocks++ } }
+        p.run(30, joltAt = 12.0, jolt = 1.2f)
+        val (still, touch) = p.takeWindow()
+        assertEquals(1, knocks)
+        assertTrue(p.faceDown)
         assertTrue("still=$still", still >= 80)
-        assertTrue("touch=$touch", touch in 250..350)
+        assertTrue("touch=$touch", touch >= 1000)
+    }
+
+    @Test
+    fun ourOwnVibrationIsNotAKnock() {
+        var knocks = 0
+        val p = probe().apply { onKnock = { knocks++ }; quiet(start + 11_900_000_000L, 1000) }
+        p.run(30, joltAt = 12.0, jolt = 1.2f)
+        assertEquals(0, knocks)
     }
 
     @Test
     fun injectedTapMovesNothing() {
-        val (_, touch) = probe().apply { run(30, tapAt = 12.0, jolt = 0f) }.takeWindow()
-        assertTrue("touch=$touch", touch < 40)  // below the missions' min_touch_motion
+        var knocks = 0
+        val p = probe().apply { onKnock = { knocks++ } }
+        p.run(30, joltAt = 12.0, jolt = 0f, tapAtJolt = true)
+        val (_, touch) = p.takeWindow()
+        assertEquals(0, knocks)
+        assertTrue("touch=$touch", touch < 40)
     }
 
     @Test
-    fun phoneHeldInHandIsNotStill() {
-        val (still, _) = probe().apply { run(30, tapAt = null, jolt = 0f, handNoise = 0.6f) }.takeWindow()
-        assertTrue("still=$still", still < 60)
+    fun faceUpOrInHandIsNotFaceDownAndStill() {
+        val up = probe().apply { run(30, joltAt = null, jolt = 0f, up = 1) }
+        assertFalse(up.faceDown)
+        assertTrue(up.takeWindow().first < 10)
+        val hand = probe().apply { run(30, joltAt = null, jolt = 0f, handNoise = 0.6f) }
+        assertTrue(hand.takeWindow().first < 60)
     }
 
     @Test

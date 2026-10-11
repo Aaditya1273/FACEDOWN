@@ -39,7 +39,7 @@ import com.presence.ui.theme.LocalReducedMotion
 import kotlin.math.PI
 import kotlin.math.sin
 
-/** Pip, the CLOCK IN bird. One pose per moment; art lives in res/drawable-nodpi (cut from public/macouts.png). */
+/** Pip, the FACEDOWN bird. One pose per moment; art lives in res/drawable-nodpi (cut from public/macouts.png). */
 enum class PipMood(@DrawableRes val art: Int, val description: String) {
     Ready(R.drawable.mascot_ready, "Pip waving hello"),
     Still(R.drawable.mascot_still, "Pip focusing with a notepad"),

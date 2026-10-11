@@ -27,6 +27,8 @@ sealed interface Screen {
         val sealed: List<String> = emptyList(),
         /** The presence check for the current window is showing. */
         val promptVisible: Boolean = false,
+        /** The accelerometer says the screen is facing the table. */
+        val faceDown: Boolean = false,
     ) : Screen
     data class Verifying(val checks: List<Check>) : Screen
     data class Result(val receipt: Receipt, val checkpointHashes: List<String>) : Screen
@@ -62,7 +64,7 @@ fun reasonMessage(reason: String): String = when (reason) {
     "ALREADY_CLAIMED" -> "You've used today's clock-ins for this session length."
     "STAKE_REQUIRED", "STAKE_FAILED" -> "The stake didn't go through, so the session didn't start. Nothing was taken."
     "ATTESTATION_FAILED" -> "Your session was verified, but recording it on Solana failed."
-    "NETWORK_ERROR" -> "Can't reach the CLOCK IN server. Check your connection and try again."
+    "NETWORK_ERROR" -> "Can't reach the FACEDOWN server. Check your connection and try again."
     "WALLET_NOT_CONNECTED" -> "Connect your wallet first."
     "WALLET_NOT_FOUND" -> "No Mobile Wallet Adapter wallet is installed."
     "WALLET_REJECTED" -> "The wallet request was cancelled. Nothing was signed or taken."

@@ -170,7 +170,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.Today(
         when {
             s.wallet == null -> {
                 PrimaryButton("Connect wallet", loading = s.busy, onClick = onConnect)
-                Text("Uses your Solana wallet app. CLOCK IN never sees your keys.",
+                Text("Uses your Solana wallet app. FACEDOWN never sees your keys.",
                     style = MaterialTheme.typography.bodyMedium, color = SemanticColors.TertiaryText,
                     modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.related))
             }
@@ -179,7 +179,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.Today(
                 Gap(16)
             }
             else -> {
-                PrimaryButton("Clock in  →", enabled = !s.busy) { onOpen(m) }
+                PrimaryButton("Go facedown  →", enabled = !s.busy) { onOpen(m) }
                 Gap(16)
             }
         }
@@ -418,9 +418,9 @@ private fun androidx.compose.foundation.layout.ColumnScope.ProfileTab(
     Gap(32)
     SectionLabel("Privacy")
     Gap(8)
-    Text("During a session CLOCK IN records whether the app stayed on screen, when you answered each check-in, " +
-        "and two motion numbers per check-in from the accelerometer: how much of the time the phone lay still, and " +
-        "how much your tap moved it. Raw sensor data never leaves the phone. No location, contacts, microphone or " +
+    Text("During a session FACEDOWN records whether the app stayed on screen, when you answered each check-in, " +
+        "and two motion numbers per check-in from the accelerometer: how much of the time the phone lay still and face-down, and " +
+        "how much your knock or tap moved it. Raw sensor data never leaves the phone. No location, contacts, microphone or " +
         "camera, and nothing in the background. " +
         "Only a fingerprint (hash) of the session is written to Solana.",
         style = MaterialTheme.typography.bodyMedium, color = SemanticColors.SecondaryText)

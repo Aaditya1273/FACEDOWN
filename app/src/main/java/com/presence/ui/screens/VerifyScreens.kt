@@ -242,7 +242,7 @@ private fun Qr(text: String, sizeDp: Int) {
 
 private fun shareReceipt(ctx: Context, rc: Receipt) {
     val text = buildString {
-        append("I kept my commitment on CLOCK IN: ${rc.missionName}, ${minutesLabel(rc.durationSeconds.toInt())}, verified.\n")
+        append("I went facedown on FACEDOWN: ${rc.missionName}, ${minutesLabel(rc.durationSeconds.toInt())}, verified.\n")
         rc.settlement.explorerUrl?.let { append("On-chain proof: $it\n") }
         if (rc.mode == "development") append("(development mode, test network)\n")
     }

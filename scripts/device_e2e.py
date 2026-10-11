@@ -72,7 +72,20 @@ def fresh_identity() -> None:
     adb("shell", "am", "start", "-n", "com.presence/.MainActivity")
     tap("Connect wallet")
     tap("AUTHORIZE")
-    wait_for("Clock in  →")
+    wait_for("Go facedown  →")
+
+
+def approve_wallet(timeout: float = 60) -> None:
+    """Approve every wallet prompt (authorize, sign message, sign transaction) until the session starts."""
+    end = time.time() + timeout
+    while time.time() < end:
+        if find("Starting in") or find(" goal") or find("Session not verified"):
+            return
+        if (xy := find("AUTHORIZE")):
+            adb("shell", "input", "tap", str(xy[0]), str(xy[1]))
+            time.sleep(1)
+        time.sleep(0.5)
+    raise SystemExit(f"wallet never returned; screen: {texts()}")
 
 
 def run_mission(skip_window: int | None = None, leave_at: float | None = None, duration: str = "2 min",
@@ -80,12 +93,10 @@ def run_mission(skip_window: int | None = None, leave_at: float | None = None, d
     """stake=None runs the free, sponsor-funded variant."""
     tap(duration)                     # duration selector on Today
     tap(stake or "Free")              # stake selector on Today
-    tap("Clock in  →")
+    tap("Go facedown  →")
     tap("During the session")         # consent row
-    tap("& clock in" if stake else "Clock in")  # "Stake 1 SKR-TEST & clock in" / "Clock in"
-    tap("AUTHORIZE")                  # wallet signs the SIWS message...
-    if stake:
-        tap("AUTHORIZE")              # ...and the stake transaction, in the same wallet session
+    tap("& go facedown" if stake else "Go facedown")  # "Stake 1 SKR-TEST & go facedown" / "Go facedown"
+    approve_wallet()                  # sign-in message, devnet re-authorization, stake transaction
     wait_for(" goal", 90)      # stake confirmation + countdown, then the active session
     start = time.time()
     left = False

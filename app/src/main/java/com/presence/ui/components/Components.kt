@@ -82,14 +82,14 @@ fun Page(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> U
 )
 
 @Composable
-fun TopBar(title: String = "CLOCK IN", onBack: (() -> Unit)? = null, trailing: @Composable RowScope.() -> Unit = {}) =
+fun TopBar(title: String = "FACEDOWN", onBack: (() -> Unit)? = null, trailing: @Composable RowScope.() -> Unit = {}) =
     Row(Modifier.fillMaxWidth().height(56.dp), verticalAlignment = Alignment.CenterVertically) {
         if (onBack != null) {
             TextButton(onClick = onBack, contentPadding = PaddingValues(horizontal = 0.dp)) {
                 Text("← Back", style = MaterialTheme.typography.labelLarge, color = SemanticColors.PrimaryText)
             }
         } else {
-            // Wordmark from the brand sheet: "CLOCK IN." with a green full stop.
+            // Wordmark: "FACEDOWN." with a green full stop.
             Text(buildAnnotatedString {
                 append(title)
                 withStyle(SpanStyle(color = BrandColors.Green)) { append(".") }

@@ -106,7 +106,7 @@ fun ClockInRoot(sender: ActivityResultSender, vm: PresenceViewModel = hiltViewMo
                     onOpen = vm::openMission, onDisconnect = vm::disconnect, onRetry = { vm.refresh() })
                 Screen.Mission -> MissionScreen(s, onBack = vm::home, onStart = { vm.startMission(sender) })
                 is Screen.Countdown -> CountdownScreen(screen.seconds)
-                is Screen.Active -> ActiveScreen(screen, onPulse = vm::onPulse)
+                is Screen.Active -> ActiveScreen(screen, onPulse = vm::onPulse, onBuzz = vm::onBuzz)
                 is Screen.Verifying -> VerifyingScreen(screen)
                 is Screen.Result -> ReceiptScreen(screen, onDone = vm::home)
                 is Screen.Failed -> FailedScreen(screen, onRetry = vm::openMission, onHome = vm::home)

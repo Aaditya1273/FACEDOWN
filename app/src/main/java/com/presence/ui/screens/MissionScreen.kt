@@ -82,23 +82,23 @@ fun MissionScreen(s: UiState, onBack: () -> Unit, onStart: () -> Unit) = Page {
         Gap(32)
         SectionLabel(if (staked) "To keep your stake" else "To finish")
         Gap(4)
-        Rule("Keep CLOCK IN open and lay the phone face-up on a table. The screen stays on.")
-        Rule("When it buzzes, tap “I'm here”. That's ${m.requiredCheckpoints} taps in ${minutesLabel(m.durationSeconds)}.")
+        Rule("Keep FACEDOWN open and lay the phone face-down on a table. The screen goes dark.")
+        Rule("When it buzzes, knock on the back of the phone. That's ${m.requiredCheckpoints} knocks in ${minutesLabel(m.durationSeconds)}.")
         Rule("Stay online until the result appears.")
 
         Gap(24)
         SectionLabel(if (staked) "You lose the stake if" else "The session fails if")
         Gap(4)
         Rule("You switch apps, go home, or lock the phone")
-        Rule("You miss a check-in, or keep the phone in your hand")
+        Rule("You miss a check-in, or pick the phone up and keep it face-up")
         Rule("The session runs out before it's finished")
 
         Gap(24)
         SectionLabel("What's verified")
         Gap(8)
-        Text("The CLOCK IN server keeps the time, so a phone clock can't be faked. It checks that this phone stayed " +
-            "in the app, lay still, and was answered at unpredictable moments by a real finger: the motion sensor " +
-            "feels every tap, so a script or AI agent tapping for you is caught. It can't tell what you focused on." +
+        Text("The FACEDOWN server keeps the time, so a phone clock can't be faked. It checks that this phone stayed " +
+            "in the app, lay still and face-down, and was answered at unpredictable moments by a real knock: the " +
+            "motion sensor feels every knock or tap, so a script or AI agent answering for you is caught. It can't tell what you focused on." +
             if (staked) " Forfeited stakes go to the pool that pays finishers' bonuses." else "",
             style = MaterialTheme.typography.bodyMedium, color = SemanticColors.SecondaryText)
         Gap(24)
@@ -123,16 +123,16 @@ fun MissionScreen(s: UiState, onBack: () -> Unit, onStart: () -> Unit) = Page {
         Spacer(Modifier.width(Spacing.related))
         Text(
             (if (staked) "I understand I lose $stake if I leave or miss a check-in. " else "") +
-                "During the session CLOCK IN records only whether it stays on screen, when I answer, and two " +
-                "motion numbers (how still the phone lay, how much my taps moved it).",
+                "During the session FACEDOWN records only whether it stays on screen, when I answer, and two " +
+                "motion numbers (how still and face-down the phone lay, how much my knocks moved it).",
             style = MaterialTheme.typography.bodyMedium, color = SemanticColors.PrimaryText,
         )
     }
     PrimaryButton(
         when {
             s.busy -> "Waiting for your wallet…"
-            staked -> "Stake $stake & clock in"
-            else -> "Clock in"
+            staked -> "Stake $stake & go facedown"
+            else -> "Go facedown"
         },
         enabled = consent, loading = s.busy, onClick = onStart)
     Gap(16)

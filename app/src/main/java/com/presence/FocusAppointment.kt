@@ -62,7 +62,7 @@ object FocusAppointment {
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP), PendingIntent.FLAG_IMMUTABLE)
             nm.notify(1, NotificationCompat.Builder(ctx, CHANNEL)
                 .setSmallIcon(R.drawable.ic_launcher_monochrome)
-                .setContentTitle("Time to clock in")
+                .setContentTitle("Time to go facedown")
                 .setContentText("Your focus appointment is now. Phone down, Pip's waiting.")
                 .setContentIntent(open)
                 .setAutoCancel(true)

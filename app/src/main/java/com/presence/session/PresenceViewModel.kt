@@ -120,9 +120,17 @@ class PresenceViewModel @Inject constructor(
 
     fun clearMessage() = _state.update { it.copy(message = null) }
 
+    /** "I'm here" tapped on the screen: the probe scores how much the finger moved the phone. */
     fun onPulse() {
-        windowTaps++
         motion?.onTap()
+        pulse()
+    }
+
+    /** About to buzz: the vibration motor shakes the accelerometer, so don't read it as a knock. */
+    fun onBuzz() = motion?.quiet(900)
+
+    private fun pulse() {
+        windowTaps++
         if (windowResponseMs < 0 && promptAtRunning.isNotEmpty()) {
             val elapsed = SystemClock.elapsedRealtime() - sessionStart
             val window = (elapsed / intervalMsRunning).toInt().coerceAtMost(promptAtRunning.size - 1)
@@ -237,6 +245,8 @@ class PresenceViewModel @Inject constructor(
         windowForeground = true
         anyBackground = false
         val probe = MotionProbe(context).also { it.start(); motion = it }
+        // A knock on the back answers the check-in, so a face-down phone never has to be picked up.
+        probe.onKnock = { if ((_state.value.screen as? Screen.Active)?.promptVisible == true) pulse() }
         var done = 0
         // Each window's presence check appears at an unpredictable moment, 15-60% into the window.
         val promptAt = List(policy.requiredCheckpoints) { (intervalMs * (0.15 + Math.random() * 0.45)).toLong() }
@@ -257,6 +267,7 @@ class PresenceViewModel @Inject constructor(
                 leftForeground = anyBackground,
                 sealed = chain.hashes.take(done).map { h -> h.toHex() },
                 promptVisible = !confirmed && elapsed % intervalMs >= promptAt[window],
+                faceDown = probe.faceDown,
             ))
         }
         publish(false)
