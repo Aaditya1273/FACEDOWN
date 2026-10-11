@@ -1,8 +1,9 @@
 package com.presence.session
 
+import android.content.Context
 import android.os.SystemClock
 import android.util.Base64
-import com.presence.ui.screens.formatToken
+import com.presence.ui.components.formatToken
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -14,10 +15,12 @@ import com.presence.attest.MissionPolicy
 import com.presence.evidence.CheckpointData
 import com.presence.evidence.EphemeralKey
 import com.presence.evidence.EvidenceChain
+import com.presence.evidence.MotionProbe
 import com.presence.evidence.toHex
 import com.presence.wallet.WalletRepository
 import com.solana.mobilewalletadapter.clientlib.ActivityResultSender
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -36,6 +39,7 @@ import javax.inject.Inject
 class PresenceViewModel @Inject constructor(
     private val api: AttestApi,
     private val wallet: WalletRepository,
+    @ApplicationContext private val context: Context,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(UiState(wallet = wallet.account))
@@ -52,6 +56,7 @@ class PresenceViewModel @Inject constructor(
     @Volatile private var promptAtRunning: List<Long> = emptyList()
     @Volatile private var windowForeground = true
     @Volatile private var anyBackground = false
+    @Volatile private var motion: MotionProbe? = null
 
     init {
         refresh()
@@ -62,10 +67,11 @@ class PresenceViewModel @Inject constructor(
             val health = api.health()
             val missions = api.missions()
             val profile = wallet.account?.let { api.profile(it.address) }
+            val history = wallet.account?.let { runCatching { api.history(it.address) }.getOrNull() } ?: emptyList()
             val pools = runCatching { api.pools().missions }.getOrDefault(emptyMap())
             _state.update { s ->
                 val selected = missions.firstOrNull { m -> m.missionId == s.mission?.missionId } ?: missions.firstOrNull()
-                s.copy(health = health, missions = missions, mission = selected, profile = profile, pools = pools,
+                s.copy(health = health, missions = missions, mission = selected, profile = profile, pools = pools, history = history,
                     backendError = null)
             }
         } catch (e: CancellationException) {
@@ -97,12 +103,14 @@ class PresenceViewModel @Inject constructor(
 
     fun disconnect() {
         wallet.disconnect()
-        _state.update { it.copy(wallet = null, profile = null) }
+        _state.update { it.copy(wallet = null, profile = null, history = emptyList()) }
     }
 
     fun openMission() = _state.update { it.copy(screen = Screen.Mission) }
 
     fun openMission(m: MissionPolicy) = _state.update { it.copy(mission = m, screen = Screen.Mission) }
+
+    fun select(m: MissionPolicy) = _state.update { it.copy(mission = m) }
 
     fun home() {
         missionJob?.cancel()
@@ -114,6 +122,7 @@ class PresenceViewModel @Inject constructor(
 
     fun onPulse() {
         windowTaps++
+        motion?.onTap()
         if (windowResponseMs < 0 && promptAtRunning.isNotEmpty()) {
             val elapsed = SystemClock.elapsedRealtime() - sessionStart
             val window = (elapsed / intervalMsRunning).toInt().coerceAtMost(promptAtRunning.size - 1)
@@ -165,13 +174,15 @@ class PresenceViewModel @Inject constructor(
 
                 val checks = mutableListOf(
                     Check("Wallet signature", CheckStatus.PASSED),
-                    Check("Seeker eligibility",
+                    Check("Seeker device check",
                         if (auth.eligibility == "SGT_VERIFIED") CheckStatus.PASSED else CheckStatus.DEV_BYPASS),
-                    Check("Session nonce", CheckStatus.PASSED),
-                    Check("Evidence continuity"),
-                    Check("Mission policy"),
-                    Check("Replay protection"),
-                    Check("On-chain attestation"),
+                    Check("One-time session code", CheckStatus.PASSED),
+                    Check("Session evidence"),
+                    Check("Session rules"),
+                    Check("Human touch"),
+                    Check("Phone stayed down"),
+                    Check("Not claimed before"),
+                    Check("Recorded on Solana"),
                 )
                 fun show() = _state.update { it.copy(screen = Screen.Verifying(checks.toList())) }
                 show()
@@ -186,9 +197,16 @@ class PresenceViewModel @Inject constructor(
                 if (!result.verified || receipt == null) {
                     throw AttestException(result.reason ?: "POLICY_NOT_SATISFIED", result.detail ?: "")
                 }
+                fun physical(key: String) = when (receipt.checks[key]) {
+                    "PASSED" -> CheckStatus.PASSED
+                    "FLAGGED" -> CheckStatus.FLAGGED
+                    else -> CheckStatus.NOT_CONFIGURED
+                }
                 checks[4] = checks[4].copy(status = CheckStatus.PASSED)
-                checks[5] = checks[5].copy(status = CheckStatus.PASSED)
-                checks[6] = checks[6].copy(status = when (receipt.settlement.status) {
+                checks[5] = checks[5].copy(status = physical("human_touch"))
+                checks[6] = checks[6].copy(status = physical("phone_down"))
+                checks[7] = checks[7].copy(status = CheckStatus.PASSED)
+                checks[8] = checks[8].copy(status = when (receipt.settlement.status) {
                     "CONFIRMED" -> CheckStatus.PASSED
                     "NOT_CONFIGURED" -> CheckStatus.NOT_CONFIGURED
                     else -> CheckStatus.FAILED
@@ -218,6 +236,7 @@ class PresenceViewModel @Inject constructor(
         windowTaps = 0
         windowForeground = true
         anyBackground = false
+        val probe = MotionProbe(context).also { it.start(); motion = it }
         var done = 0
         // Each window's presence check appears at an unpredictable moment, 15-60% into the window.
         val promptAt = List(policy.requiredCheckpoints) { (intervalMs * (0.15 + Math.random() * 0.45)).toLong() }
@@ -253,6 +272,7 @@ class PresenceViewModel @Inject constructor(
             for (i in 0 until policy.requiredCheckpoints) {
                 val due = start + (i + 1) * intervalMs
                 delay((due - SystemClock.elapsedRealtime()).coerceAtLeast(0))
+                val (stillPct, touchMotion) = probe.takeWindow()
                 val cp = CheckpointData(
                     index = i,
                     timestampMs = System.currentTimeMillis(),
@@ -260,6 +280,8 @@ class PresenceViewModel @Inject constructor(
                     foreground = windowForeground,
                     interactions = windowTaps,
                     responseMs = windowResponseMs,
+                    stillPct = stillPct,
+                    touchMotion = touchMotion,
                 )
                 windowTaps = 0
                 windowResponseMs = -1
@@ -267,12 +289,14 @@ class PresenceViewModel @Inject constructor(
                 val hash = chain.append(cp)
                 api.checkpoint(sessionId, CheckpointBody(
                     cp.index, cp.timestampMs, cp.elapsedMs, cp.foreground, cp.interactions, cp.responseMs,
-                    hash.toHex(), key.sign(hash)))
+                    cp.stillPct, cp.touchMotion, hash.toHex(), key.sign(hash)))
                 done = i + 1
                 publish(false)
             }
         } finally {
             ticker.cancel()
+            probe.stop()
+            motion = null
         }
     }
 

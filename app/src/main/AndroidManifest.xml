@@ -5,6 +5,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Buzz when a presence check appears while the phone is face-up on the desk. -->
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Daily focus-appointment reminder (asked only when the user books a time). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- Backups disabled: prefs hold the MWA auth token. -->
     <application
@@ -16,18 +18,19 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Presence"
+        android:theme="@style/Theme.ClockIn"
         tools:targetApi="31">
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:screenOrientation="portrait"
-            android:theme="@style/Theme.Presence">
+            android:theme="@style/Theme.ClockIn.Starting">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <receiver android:name=".FocusAppointment$Reminder" android:exported="false" />
     </application>
 
 </manifest>

@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.net.Uri
 import com.presence.BuildConfig
+import com.presence.wallet.WalletIdentity
 import com.solana.mobilewalletadapter.clientlib.ConnectionIdentity
 import com.solana.mobilewalletadapter.clientlib.MobileWalletAdapter
 import com.solana.mobilewalletadapter.clientlib.Solana
@@ -29,11 +30,7 @@ object AppModule {
     @Singleton
     fun walletAdapter(): MobileWalletAdapter =
         MobileWalletAdapter(
-            connectionIdentity = ConnectionIdentity(
-                identityUri = Uri.parse("https://presence.local"),
-                iconUri = Uri.parse("favicon.ico"),
-                identityName = "PRESENCE",
-            )
+            connectionIdentity = ConnectionIdentity(WalletIdentity.uri, WalletIdentity.icon, WalletIdentity.name)
         ).apply {
             blockchain = when (BuildConfig.NETWORK) {
                 "mainnet" -> Solana.Mainnet

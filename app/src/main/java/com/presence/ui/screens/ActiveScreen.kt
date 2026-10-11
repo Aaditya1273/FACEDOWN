@@ -1,57 +1,50 @@
 package com.presence.ui.screens
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
+import android.os.VibrationEffect
+import android.os.Vibrator
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import android.os.VibrationEffect
-import android.os.Vibrator
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.presence.session.Screen
-import com.presence.ui.theme.Ink
+import com.presence.ui.components.Gap
+import com.presence.ui.components.Page
+import com.presence.ui.components.Pip
+import com.presence.ui.components.PipMood
+import com.presence.ui.components.PrimaryButton
+import com.presence.ui.components.ProgressRing
+import com.presence.ui.components.StatusLabel
+import com.presence.ui.components.TopBar
+import com.presence.ui.components.minutesLabel
+import com.presence.ui.theme.BrandColors
+import com.presence.ui.theme.LocalReducedMotion
+import com.presence.ui.theme.Motion
+import com.presence.ui.theme.SemanticColors
 
+/** The quietest screen: a timer, one line of status, and a check-in button only when one is due. */
 @Composable
 fun ActiveScreen(a: Screen.Active, onPulse: () -> Unit) = Page {
-    val haptics = LocalHapticFeedback.current
     val view = LocalView.current
     val context = LocalContext.current
     // The phone sits face-up on the desk: keep the screen (and so the session) alive.
@@ -59,145 +52,86 @@ fun ActiveScreen(a: Screen.Active, onPulse: () -> Unit) = Page {
         view.keepScreenOn = true
         onDispose { view.keepScreenOn = false }
     }
-    LaunchedEffect(a.checkpointsDone) {
-        if (a.checkpointsDone > 0) haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-    }
+    // One buzz per check-in: that's how a phone-down user knows to look. No other haptics.
     LaunchedEffect(a.promptVisible) {
         if (a.promptVisible) context.getSystemService(Vibrator::class.java)?.vibrate(
             VibrationEffect.createWaveform(longArrayOf(0, 180, 120, 180), -1))
     }
-    val breathe = rememberInfiniteTransition(label = "breathe")
-    val glow by breathe.animateFloat(0.3f, 1f, infiniteRepeatable(tween(1100), RepeatMode.Reverse), label = "glow")
 
-    Header(null)
-    Gap(20)
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.alpha(glow)) { Dot(if (a.leftForeground) Ink.Fail else Ink.Verified) }
-        HGap(10)
-        Eyebrow(if (a.leftForeground) "Session interrupted" else "Session live · recording evidence",
-            color = if (a.leftForeground) Ink.Fail else Ink.Text)
+    TopBar {
+        if (a.leftForeground) StatusLabel("Session interrupted") else StatusLabel("Session active", accent = true)
     }
-    Gap(24)
-    TimerRing(a)
-    Gap(28)
-    Eyebrow("Evidence chain")
-    Gap(12)
-    EvidenceChainView(a, glow)
     Spacer(Modifier.weight(1f))
-    PresenceCheck(a) {
-        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-        onPulse()
-    }
+    Timer(a)
+    Gap(24)
+    Text("Check-in ${(a.checkpointsDone + 1).coerceAtMost(a.checkpointsTotal)} of ${a.checkpointsTotal}",
+        style = MaterialTheme.typography.labelMedium, color = SemanticColors.TertiaryText,
+        modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+    Gap(8)
+    Text(
+        when {
+            a.leftForeground -> "You left the app, so this session can't be verified."
+            a.confirmedThisWindow -> "Checked in. Phone down until the next buzz."
+            else -> "Phone down. It buzzes when it's time to check in."
+        },
+        style = MaterialTheme.typography.bodyLarge,
+        color = if (a.leftForeground) SemanticColors.PrimaryText else SemanticColors.SecondaryText,
+        textAlign = TextAlign.Center,
+        modifier = Modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Polite },
+    )
+    Spacer(Modifier.weight(1f))
+    CheckIn(a.promptVisible, onPulse)
+    Gap(24)
 }
 
 @Composable
-private fun TimerRing(a: Screen.Active) {
-    val progress by animateFloatAsState((a.elapsedMs.toFloat() / a.durationMs).coerceIn(0f, 1f), tween(200), label = "p")
+private fun Timer(a: Screen.Active) {
     val remaining = ((a.durationMs - a.elapsedMs).coerceAtLeast(0) + 999) / 1000
     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-        Canvas(Modifier.size(196.dp)) {
-            val stroke = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
-            drawArc(Ink.Line, 0f, 360f, false, style = stroke)
-            drawArc(Ink.Text, -90f, 360f * progress, false, style = stroke)
-        }
+        ProgressRing((a.elapsedMs.toFloat() / a.durationMs).coerceIn(0f, 1f), Modifier.size(264.dp),
+            color = if (a.leftForeground) SemanticColors.Disabled else BrandColors.Green)
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text("%02d:%02d".format(remaining / 60, remaining % 60),
-                style = MaterialTheme.typography.displayMedium, color = Ink.Text)
-            Eyebrow("${a.checkpointsDone} of ${a.checkpointsTotal} sealed")
+                style = MaterialTheme.typography.displayLarge, color = SemanticColors.PrimaryText)
+            Text("${minutesLabel((a.durationMs / 1000).toInt())} goal",
+                style = MaterialTheme.typography.bodyMedium, color = SemanticColors.SecondaryText)
         }
     }
 }
 
-/** One block per checkpoint: sealed (server accepted, shows its fingerprint), sealing, or pending. */
+/** Fixed-height slot so the layout never jumps when a check-in appears. Pip is alive but slow and quiet. */
 @Composable
-private fun EvidenceChainView(a: Screen.Active, glow: Float) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        (0 until a.checkpointsTotal).chunked(3).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                row.forEachIndexed { j, i ->
-                    if (j > 0) Box(Modifier.width(6.dp).height(1.dp).background(
-                        if (i <= a.sealed.size) Ink.Verified.copy(alpha = 0.6f) else Ink.Line))
-                    Block(i, a.sealed.getOrNull(i), sealing = i == a.sealed.size, glow, Modifier.weight(1f))
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun Block(index: Int, hash: String?, sealing: Boolean, glow: Float, modifier: Modifier) {
-    val border by animateColorAsState(
-        when {
-            hash != null -> Ink.Verified
-            sealing -> Ink.Text.copy(alpha = glow)
-            else -> Ink.Line
-        }, tween(400), label = "b")
-    Column(
-        modifier
-            .border(1.dp, border, RoundedCornerShape(10.dp))
-            .background(if (hash != null) Ink.Verified.copy(alpha = 0.06f) else Ink.Surface, RoundedCornerShape(10.dp))
-            .padding(horizontal = 10.dp, vertical = 10.dp),
-    ) {
-        Text("#${index + 1}", style = MaterialTheme.typography.labelMedium,
-            color = if (hash != null) Ink.Verified else Ink.Muted)
-        Gap(4)
-        Text(
-            when {
-                hash != null -> "${hash.take(4)}…${hash.takeLast(4)}"
-                sealing -> "sealing…"
-                else -> "pending"
-            },
-            style = MaterialTheme.typography.labelSmall,
-            color = if (hash != null) Ink.Text else Ink.Muted,
-        )
-    }
-}
-
-@Composable
-private fun PresenceCheck(a: Screen.Active, onConfirm: () -> Unit) {
-    Box(Modifier.fillMaxWidth().height(132.dp)) {
-        AnimatedVisibility(a.promptVisible, enter = fadeIn() + slideInVertically { it / 3 },
-            exit = fadeOut() + slideOutVertically { it / 3 }) {
-            Column(
-                Modifier.fillMaxSize()
-                    .border(1.dp, Ink.Text.copy(alpha = 0.4f), RoundedCornerShape(16.dp))
-                    .background(Ink.Surface, RoundedCornerShape(16.dp))
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text("Still here?", style = MaterialTheme.typography.titleMedium, color = Ink.Text)
+private fun CheckIn(visible: Boolean, onConfirm: () -> Unit) {
+    val reduced = LocalReducedMotion.current
+    Box(Modifier.fillMaxWidth().height(144.dp), contentAlignment = Alignment.Center) {
+        AnimatedContent(visible, label = "checkin", transitionSpec = {
+            val d = if (reduced) 0 else Motion.control
+            fadeIn(tween(d)) togetherWith fadeOut(tween(d))
+        }) { show ->
+            if (show) Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("Still here?", style = MaterialTheme.typography.titleMedium, color = SemanticColors.PrimaryText)
+                Gap(12)
                 PrimaryButton("I'm here", onClick = onConfirm)
-            }
-        }
-        if (!a.promptVisible) {
-            Text(
-                when {
-                    a.leftForeground -> "You left the session. That window will not satisfy the mission policy."
-                    a.confirmedThisWindow -> "✓ Presence confirmed for this window"
-                    else -> "Phone down, focus on. It buzzes once per window; tap \"I'm here\" when it does."
-                },
-                style = MaterialTheme.typography.bodyMedium,
-                color = when {
-                    a.leftForeground -> Ink.Fail
-                    a.confirmedThisWindow -> Ink.Verified
-                    else -> Ink.Muted
-                },
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth().align(Alignment.Center),
-            )
+            } else Pip(PipMood.Still, 136.dp, entrance = true, live = true) // hops back in after each check-in
         }
     }
 }
 
 @Composable
 fun CountdownScreen(seconds: Int) = Page {
-    Header(null)
+    TopBar()
     Spacer(Modifier.weight(1f))
-    Eyebrow("Get ready", modifier = Modifier.fillMaxWidth())
-    Gap(8)
-    Text("$seconds", style = MaterialTheme.typography.displayLarge, color = Ink.Text)
-    Gap(8)
-    Text("Phone down, screen on. Each buzz is a presence check: tap \"I'm here\". Leave the app and the stake goes to the pool.",
-        style = MaterialTheme.typography.bodyLarge, color = Ink.Muted)
+    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        Pip(PipMood.Still, 176.dp, entrance = true, live = true)
+        Gap(24)
+        Text("Put your phone down.", style = MaterialTheme.typography.headlineLarge, color = SemanticColors.PrimaryText,
+            textAlign = TextAlign.Center)
+        Gap(8)
+        Text("Keep CLOCK IN on screen. It buzzes when it's time to check in.",
+            style = MaterialTheme.typography.bodyLarge, color = SemanticColors.SecondaryText, textAlign = TextAlign.Center)
+        Gap(32)
+        Text("Starting in $seconds", style = MaterialTheme.typography.labelMedium, color = SemanticColors.TertiaryText,
+            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
+    }
     Spacer(Modifier.weight(1f))
 }

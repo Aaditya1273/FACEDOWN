@@ -23,7 +23,9 @@ import javax.inject.Singleton
 /** Server-side failure reasons (backend/attest/errors.py) plus client-only ones. */
 class AttestException(val reason: String, val detail: String = "") : Exception("$reason $detail")
 
-@Serializable data class Health(val mode: String, val network: String, val settlement: String)
+@Serializable data class Health(val mode: String, val network: String, val settlement: String,
+                               /** "enforced" or "reported" (development: emulators have no real motion). */
+                               val physical: String = "enforced")
 
 @Serializable
 data class Reward(
@@ -86,6 +88,22 @@ data class Profile(
     @SerialName("claims_today") val claimsToday: Map<String, Int> = emptyMap(),
 )
 
+/** One finished session from GET /history/{wallet}; every field comes from the stored server receipt. */
+@Serializable
+data class HistoryItem(
+    @SerialName("session_id") val sessionId: String,
+    @SerialName("mission_name") val missionName: String,
+    val state: String,
+    @SerialName("started_at") val startedAt: Double? = null,
+    @SerialName("duration_seconds") val durationSeconds: Double = 0.0,
+    val reason: String? = null,
+    @SerialName("stake_forfeited") val stakeForfeited: Double = 0.0,
+    val paid: Double = 0.0,
+    val symbol: String? = null,
+    @SerialName("settlement_status") val settlementStatus: String? = null,
+    @SerialName("explorer_url") val explorerUrl: String? = null,
+)
+
 @Serializable
 data class Settlement(
     val status: String,
@@ -136,6 +154,7 @@ class AttestApi @Inject constructor(@PublishedApi internal val http: HttpClient)
     suspend fun health(): Health = get("/health")
     suspend fun missions(): List<MissionPolicy> = get("/missions")
     suspend fun profile(wallet: String): Profile = get("/profile/$wallet")
+    suspend fun history(wallet: String): List<HistoryItem> = get("/history/$wallet")
 
     suspend fun createSession(wallet: String, missionId: String, ephemeralPubkey: String): SessionCreated =
         post("/session", mapOf("wallet" to wallet, "mission_id" to missionId, "ephemeral_pubkey" to ephemeralPubkey))
@@ -200,6 +219,8 @@ data class CheckpointBody(
     val foreground: Boolean,
     val interactions: Int,
     @SerialName("response_ms") val responseMs: Long,
+    @SerialName("still_pct") val stillPct: Int,
+    @SerialName("touch_motion") val touchMotion: Int,
     val hash: String,
     val signature: String,
 )
