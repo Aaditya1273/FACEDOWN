@@ -98,6 +98,17 @@ class WalletRepository @Inject constructor(
         }
     }
 
+    /** Sign one transaction ATTEST built (e.g. a streak-freeze payment); ATTEST submits it. */
+    suspend fun signTransaction(sender: ActivityResultSender, tx: ByteArray): ByteArray {
+        val result = adapter.transact(sender) { signTransactions(arrayOf(tx)) }
+        return when (result) {
+            is TransactionResult.Success -> result.payload.signedPayloads.firstOrNull()
+                ?: throw AttestException("WALLET_REJECTED", "wallet returned no transaction")
+            is TransactionResult.NoWalletFound -> throw AttestException("WALLET_NOT_FOUND")
+            is TransactionResult.Failure -> throw AttestException("WALLET_REJECTED", result.e.message ?: "")
+        }
+    }
+
     fun disconnect() {
         prefs.edit().remove(KEY_ADDRESS).remove(KEY_LABEL).remove(KEY_TOKEN).apply()
         adapter.authToken = null

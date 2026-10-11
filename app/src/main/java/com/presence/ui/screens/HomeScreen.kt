@@ -84,6 +84,7 @@ fun HomeScreen(
     onOpen: (MissionPolicy) -> Unit,
     onDisconnect: () -> Unit,
     onRetry: () -> Unit,
+    onBuyFreeze: () -> Unit = {},
 ) {
     var tab by rememberSaveable { mutableStateOf(Tab.Today) }
     Column(Modifier.fillMaxSize().background(SemanticColors.Canvas)) {
@@ -95,7 +96,7 @@ fun HomeScreen(
                 }
                 when (t) {
                     Tab.Today -> Today(s, onConnect, onSelect, onOpen, onRetry)
-                    Tab.Progress -> Progress(s, onConnect = { tab = Tab.Profile })
+                    Tab.Progress -> Progress(s, onConnect = { tab = Tab.Profile }, onBuyFreeze = onBuyFreeze)
                     Tab.Profile -> ProfileTab(s, onConnect, onDisconnect, onRetry)
                 }
             }
@@ -117,13 +118,22 @@ private fun androidx.compose.foundation.layout.ColumnScope.Today(
             Column(Modifier.weight(1f)) {
                 SectionLabel(greeting())
                 Gap(4)
-                Text("Make time count.", style = MaterialTheme.typography.headlineLarge, color = SemanticColors.PrimaryText)
+                Text("Put it down. Prove it.", style = MaterialTheme.typography.headlineLarge, color = SemanticColors.PrimaryText)
             }
             if (s.backendError == null && m != null)
                 Pip(if (s.profile?.provedToday == true) PipMood.Proud else PipMood.Ready, 128.dp, entrance = true, live = true)
         }
-        Text("Put your phone down for a set time. Finish, and a real, human session is verified on Solana.",
+        Text("Phone face-down for a set time. Finish, and a real, human session is verified on Solana.",
             style = MaterialTheme.typography.bodyLarge, color = SemanticColors.SecondaryText)
+        if (s.facedownNow > 0) {
+            Gap(12)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(8.dp).background(BrandColors.Green, CircleShape))
+                Spacer(Modifier.size(Spacing.related))
+                Text(if (s.facedownNow == 1) "1 person is facedown right now" else "${s.facedownNow} people are facedown right now",
+                    style = MaterialTheme.typography.labelMedium, color = SemanticColors.PrimaryText)
+            }
+        }
 
         s.profile?.takeIf { it.streak > 0 }?.let {
             Gap(24)
@@ -153,7 +163,11 @@ private fun androidx.compose.foundation.layout.ColumnScope.Today(
             val variants = s.missions.filter { it.durationSeconds == m.durationSeconds }
             if (variants.size > 1) {
                 DurationSelector(variants, m, label = {
-                    if (staked(it)) "Stake ${formatToken(it.stake.token)} ${it.reward.symbol}" else "Free"
+                    when {
+                        it.stake.noLoss -> "No-Loss"
+                        staked(it) -> "Stake ${formatToken(it.stake.token)}"
+                        else -> "Free"
+                    }
                 }, onSelect = onSelect)
                 Gap(16)
             }
@@ -206,7 +220,18 @@ private fun Commitment(m: MissionPolicy, s: UiState) {
             }
             Hairline()
         }
-        if (m.stake.token > 0) {
+        if (m.stake.noLoss) {
+            KeyValue("Your stake", "${formatToken(m.stake.token)} $symbol, locked")
+            Hairline()
+            KeyValue("If you finish", "Stake back +${formatToken(m.reward.token)} $symbol")
+            Hairline()
+            KeyValue("If you stop early", "Stake back, no reward")
+            s.pools[m.missionId]?.let {
+                Hairline()
+                KeyValue("Sponsor pool now", "${formatToken(it.remaining)} $symbol")
+            }
+            Hairline()
+        } else if (m.stake.token > 0) {
             KeyValue("Your stake", "${formatToken(m.stake.token)} $symbol")
             Hairline()
             KeyValue("If you finish", "Stake back + up to ${(m.stake.bonusRate * 100).toInt()}%")
@@ -219,7 +244,7 @@ private fun Commitment(m: MissionPolicy, s: UiState) {
         KeyValue("Today", if (s.wallet == null) "${m.maxClaimsPerDay} per day" else "$used of ${m.maxClaimsPerDay} used")
     }
     Gap(8)
-    if (!staked(m)) {
+    if (!staked(m) || m.stake.noLoss) {
         Text("Paid by a sponsor, not by other users. Nothing of yours is at risk.",
             style = MaterialTheme.typography.bodyMedium, color = SemanticColors.TertiaryText)
     } else {
@@ -291,7 +316,8 @@ private fun WeekDots(p: Profile) = Row(horizontalArrangement = Arrangement.space
 // ---------- Progress ----------
 
 @Composable
-private fun androidx.compose.foundation.layout.ColumnScope.Progress(s: UiState, onConnect: () -> Unit) {
+private fun androidx.compose.foundation.layout.ColumnScope.Progress(s: UiState, onConnect: () -> Unit,
+                                                                    onBuyFreeze: () -> Unit) {
     Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
         Gap(16)
         Text("Progress", style = MaterialTheme.typography.headlineLarge, color = SemanticColors.PrimaryText)
@@ -308,6 +334,15 @@ private fun androidx.compose.foundation.layout.ColumnScope.Progress(s: UiState, 
             Figure("Best streak", "${p.bestStreak}", Modifier.weight(1f))
             Figure("Verified", "${p.verifiedCount}", Modifier.weight(1f))
         }
+        Gap(24)
+        Group {
+            KeyValue("Streak freezes", "${p.streakFreezes}")
+        }
+        Gap(8)
+        Text("A freeze keeps your streak through one missed day. It costs 2 ${s.missions.firstOrNull()?.reward?.symbol ?: "SKR"}; " +
+            "half is burned on Solana.", style = MaterialTheme.typography.bodyMedium, color = SemanticColors.TertiaryText)
+        Gap(8)
+        SecondaryButton(if (s.busy) "Waiting for your wallet…" else "Buy a streak freeze", onClick = onBuyFreeze)
         Gap(32)
         SectionLabel("Recent sessions")
         Gap(4)
@@ -338,6 +373,7 @@ private fun HistoryRow(h: HistoryItem) {
         h.state == "SETTLED" -> "Verified · recorded on Solana"
         h.state == "VERIFIED" -> "Verified · not recorded on-chain"
         h.stakeForfeited > 0 -> "Interrupted · ${formatToken(h.stakeForfeited)} stake to the pool"
+        h.stakeReturned > 0 -> "Interrupted · ${formatToken(h.stakeReturned)} stake returned"
         else -> "Not verified"
     }
     Row(

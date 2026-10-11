@@ -69,9 +69,10 @@ class PresenceViewModel @Inject constructor(
             val profile = wallet.account?.let { api.profile(it.address) }
             val history = wallet.account?.let { runCatching { api.history(it.address) }.getOrNull() } ?: emptyList()
             val pools = runCatching { api.pools().missions }.getOrDefault(emptyMap())
+            val live = runCatching { api.live().facedownNow }.getOrDefault(0)
             _state.update { s ->
                 val selected = missions.firstOrNull { m -> m.missionId == s.mission?.missionId } ?: missions.firstOrNull()
-                s.copy(health = health, missions = missions, mission = selected, profile = profile, pools = pools, history = history,
+                s.copy(health = health, missions = missions, mission = selected, profile = profile, pools = pools, history = history, facedownNow = live,
                     backendError = null)
             }
         } catch (e: CancellationException) {
@@ -98,6 +99,19 @@ class PresenceViewModel @Inject constructor(
             api.faucet(address)
         } catch (e: AttestException) {
             log(null, "faucet", e.reason)
+        }
+    }
+
+    /** Buy one streak freeze: the wallet signs an SKR payment; the server burns half and credits the freeze. */
+    fun buyFreeze(sender: ActivityResultSender) = viewModelScope.launch {
+        val account = wallet.account ?: return@launch
+        guarded {
+            _state.update { it.copy(busy = true) }
+            val order = api.freezeOrder(account.address)
+            val signed = wallet.signTransaction(sender, Base64.decode(order.transaction, Base64.NO_WRAP))
+            val paid = api.freezePay(order.orderId, Base64.encodeToString(signed, Base64.NO_WRAP))
+            _state.update { it.copy(busy = false, message = "Streak freeze added. ${formatToken(paid.burned)} ${order.symbol} burned.") }
+            refresh()
         }
     }
 
@@ -229,8 +243,10 @@ class PresenceViewModel @Inject constructor(
                 val err = e as? AttestException ?: AttestException("CLIENT_ERROR", e.javaClass.simpleName)
                 log(null, "failed", err.reason)
                 // A stake is only lost if the session got past authorize (the server forfeits it).
-                val lost = staked.takeIf { err.reason !in setOf("STAKE_REQUIRED", "STAKE_FAILED", "NETWORK_ERROR", "WALLET_REJECTED") }
-                _state.update { it.copy(busy = false, screen = Screen.Failed(err.reason, err.detail, lost)) }
+                val atStake = staked.takeIf { err.reason !in setOf("STAKE_REQUIRED", "STAKE_FAILED", "NETWORK_ERROR", "WALLET_REJECTED") }
+                val noLoss = mission.stake.noLoss
+                _state.update { it.copy(busy = false, screen = Screen.Failed(err.reason, err.detail,
+                    stakeLost = atStake.takeUnless { noLoss }, stakeReturned = atStake.takeIf { noLoss })) }
             } finally {
                 key.destroy()
             }
@@ -302,6 +318,7 @@ class PresenceViewModel @Inject constructor(
                     cp.index, cp.timestampMs, cp.elapsedMs, cp.foreground, cp.interactions, cp.responseMs,
                     cp.stillPct, cp.touchMotion, hash.toHex(), key.sign(hash)))
                 done = i + 1
+                runCatching { api.live().facedownNow }.onSuccess { n -> _state.update { it.copy(facedownNow = n) } }
                 publish(false)
             }
         } finally {

@@ -34,6 +34,8 @@ class RecordingAttestor:
         self.records = []
         self.deposits = {}
         self.stakes = []
+        self.refunds = []
+        self.burns = []
 
     def settle(self, rec):
         self.records.append(rec)
@@ -51,6 +53,14 @@ class RecordingAttestor:
 
     def faucet(self, wallet, lamports, amount_base):
         return "faucetsig"
+
+    def burn(self, amount_base):
+        self.burns.append(amount_base)
+        return f"burnsig{len(self.burns)}"
+
+    def refund(self, wallet, amount_base):
+        self.refunds.append((wallet, amount_base))
+        return f"refundsig{len(self.refunds)}"
 
     def verify_deposit(self, signature):
         if signature not in self.deposits:

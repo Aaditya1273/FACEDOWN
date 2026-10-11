@@ -289,6 +289,13 @@ fun FailedScreen(f: Screen.Failed, onRetry: () -> Unit, onHome: () -> Unit) = Pa
             Text(reasonMessage(f.reason), style = MaterialTheme.typography.bodyLarge,
                 color = SemanticColors.SecondaryText, textAlign = TextAlign.Center)
         }
+        f.stakeReturned?.let {
+            Gap(32)
+            SectionLabel("Your stake")
+            Gap(8)
+            Text("No-Loss: your $it is on its way back to your wallet. No reward this time, and the streak restarts.",
+                style = MaterialTheme.typography.bodyLarge, color = SemanticColors.PrimaryText)
+        }
         f.stakeLost?.let {
             Gap(32)
             SectionLabel("Your stake")

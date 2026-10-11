@@ -56,7 +56,7 @@ import com.presence.ui.theme.SemanticColors
  * answers it. Picked up, the phone shows the timer and an "I'm here" button instead.
  */
 @Composable
-fun ActiveScreen(a: Screen.Active, onPulse: () -> Unit, onBuzz: () -> Unit) {
+fun ActiveScreen(a: Screen.Active, facedownNow: Int, onPulse: () -> Unit, onBuzz: () -> Unit) {
     val view = LocalView.current
     val context = LocalContext.current
     DisposableEffect(Unit) {
@@ -85,11 +85,11 @@ fun ActiveScreen(a: Screen.Active, onPulse: () -> Unit, onBuzz: () -> Unit) {
     }
     if (dark) Box(Modifier.fillMaxSize().background(Color.Black).semantics {
         contentDescription = "Facedown. The session is running."
-    }) else Visible(a, onPulse)
+    }) else Visible(a, facedownNow, onPulse)
 }
 
 @Composable
-private fun Visible(a: Screen.Active, onPulse: () -> Unit) = Page {
+private fun Visible(a: Screen.Active, facedownNow: Int, onPulse: () -> Unit) = Page {
     TopBar {
         if (a.leftForeground) StatusLabel("Session interrupted") else StatusLabel("Session active", accent = true)
     }
@@ -111,6 +111,12 @@ private fun Visible(a: Screen.Active, onPulse: () -> Unit) = Page {
         textAlign = TextAlign.Center,
         modifier = Modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Polite },
     )
+    if (facedownNow > 1) {
+        Gap(12)
+        Text("You and ${facedownNow - 1} ${if (facedownNow == 2) "other" else "others"} are facedown right now",
+            style = MaterialTheme.typography.labelMedium, color = BrandColors.Green,
+            modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+    }
     Spacer(Modifier.weight(1f))
     CheckIn(a.promptVisible, onPulse)
     Gap(24)

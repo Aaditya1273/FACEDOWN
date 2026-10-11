@@ -150,3 +150,54 @@ def test_history_lists_finished_sessions_newest_first(api, clock, attestor):
     assert h[0]["paid"] == 1.2 and h[1]["stake_forfeited"] == 1.0
     assert h[1]["symbol"] == "SKR-TEST"  # rejected receipts carry no settlement, so it comes from the mission
     assert api.get(f"/history/{SimDevice().wallet}").json() == []
+
+
+def test_live_counts_only_running_sessions(api, clock):
+    assert api.get("/live").json() == {"facedown_now": 0}
+    sess = start(api, SimDevice())
+    assert api.get("/live").json() == {"facedown_now": 1}
+    run_process(api, sess, clock)
+    submit_and_verify(api, sess)
+    assert api.get("/live").json() == {"facedown_now": 0}
+
+
+def test_no_loss_returns_the_stake_whether_you_finish_or_not(api, svc, clock, attestor):
+    quitter = SimDevice()
+    q = start(api, quitter, mission="quick-noloss")
+    run_process(api, q, clock, foreground=False)
+    body = submit_and_verify(api, q).json()
+    assert body["verified"] is False
+    assert attestor.refunds == [(quitter.wallet, 1_000_000)]  # principal back, nothing forfeited
+    assert svc._forfeited("quick-noloss") == 0
+    h = api.get(f"/history/{quitter.wallet}").json()[0]
+    assert h["stake_returned"] == 1.0 and h["stake_forfeited"] == 0
+    finisher = SimDevice()
+    f = start(api, finisher, mission="quick-noloss")
+    run_process(api, f, clock)
+    rc = submit_and_verify(api, f).json()["receipt"]
+    assert rc["reward"]["stake"] == 1.0 and rc["reward"]["bonus"] == 0.0
+
+
+def test_abandoned_no_loss_stake_is_refunded_after_expiry(api, clock, attestor):
+    d = SimDevice()
+    start(api, d, mission="quick-noloss")  # app killed: never finishes
+    clock.advance(10_000)
+    start(api, SimDevice())  # any later session sweeps expired No-Loss stakes
+    assert attestor.refunds == [(d.wallet, 1_000_000)]
+
+
+def test_streak_freeze_is_paid_in_skr_half_burned_and_covers_a_missed_day(api, clock, attestor):
+    import base64
+    d = SimDevice()
+    s1 = start(api, d); run_process(api, s1, clock); submit_and_verify(api, s1)
+    order = api.post("/streak/freeze", json={"wallet": d.wallet}).json()
+    assert order["price"] == 2.0 and order["burn"] == 1.0
+    signed = base64.b64encode(b"signed:" + base64.b64decode(order["transaction"])).decode()
+    paid = api.post(f"/streak/freeze/{order['order_id']}", json={"signature": "-", "stake_transaction": signed}).json()
+    assert paid["freezes"] == 1 and paid["burned"] == 1.0 and attestor.burns == [1_000_000]
+    assert api.post(f"/streak/freeze/{order['order_id']}", json={"signature": "-", "stake_transaction": signed}).status_code == 409
+    clock.advance(2 * 86_400)  # skip a whole day
+    assert api.get(f"/profile/{d.wallet}").json()["streak"] == 1  # the freeze keeps it alive
+    s2 = start(api, d); run_process(api, s2, clock); submit_and_verify(api, s2)
+    p = api.get(f"/profile/{d.wallet}").json()
+    assert p["streak"] == 2 and p["streak_freezes"] == 0

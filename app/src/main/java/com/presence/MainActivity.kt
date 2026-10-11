@@ -103,10 +103,11 @@ fun ClockInRoot(sender: ActivityResultSender, vm: PresenceViewModel = hiltViewMo
             transitionSpec = { fadeIn(tween(Motion.screen)) togetherWith fadeOut(tween(Motion.micro)) }) { screen ->
             when (screen) {
                 Screen.Home -> HomeScreen(s, onConnect = { vm.connect(sender) }, onSelect = vm::select,
-                    onOpen = vm::openMission, onDisconnect = vm::disconnect, onRetry = { vm.refresh() })
+                    onOpen = vm::openMission, onDisconnect = vm::disconnect, onRetry = { vm.refresh() },
+                    onBuyFreeze = { vm.buyFreeze(sender) })
                 Screen.Mission -> MissionScreen(s, onBack = vm::home, onStart = { vm.startMission(sender) })
                 is Screen.Countdown -> CountdownScreen(screen.seconds)
-                is Screen.Active -> ActiveScreen(screen, onPulse = vm::onPulse, onBuzz = vm::onBuzz)
+                is Screen.Active -> ActiveScreen(screen, s.facedownNow, onPulse = vm::onPulse, onBuzz = vm::onBuzz)
                 is Screen.Verifying -> VerifyingScreen(screen)
                 is Screen.Result -> ReceiptScreen(screen, onDone = vm::home)
                 is Screen.Failed -> FailedScreen(screen, onRetry = vm::openMission, onHome = vm::home)

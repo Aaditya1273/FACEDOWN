@@ -80,7 +80,19 @@ CREATE TABLE IF NOT EXISTS profiles (
   reputation INTEGER NOT NULL DEFAULT 0,
   current_streak INTEGER NOT NULL DEFAULT 0,
   best_streak INTEGER NOT NULL DEFAULT 0,
-  last_day INTEGER
+  last_day INTEGER,
+  freezes INTEGER NOT NULL DEFAULT 0
+);
+-- Streak freezes bought with SKR: user -> pool transfer, half of it burned.
+CREATE TABLE IF NOT EXISTS freeze_orders (
+  id TEXT PRIMARY KEY,
+  wallet TEXT NOT NULL,
+  amount_base INTEGER NOT NULL,
+  unsigned_tx BLOB NOT NULL,
+  status TEXT NOT NULL,           -- ISSUED | PAID
+  payment_signature TEXT,
+  burn_signature TEXT,
+  created_at REAL NOT NULL
 );
 """
 
@@ -91,9 +103,10 @@ def connect(path: str | Path) -> sqlite3.Connection:
     db.execute("PRAGMA journal_mode=WAL")
     db.execute("PRAGMA foreign_keys=ON")
     db.executescript(SCHEMA)
-    for col in ("still_pct", "touch_motion"):  # databases created before physical evidence existed
+    for table, col, default in (("checkpoints", "still_pct", -1), ("checkpoints", "touch_motion", -1),
+                                ("profiles", "freezes", 0)):  # databases created before these columns existed
         try:
-            db.execute(f"ALTER TABLE checkpoints ADD COLUMN {col} INTEGER NOT NULL DEFAULT -1")
+            db.execute(f"ALTER TABLE {table} ADD COLUMN {col} INTEGER NOT NULL DEFAULT {default}")
         except sqlite3.OperationalError:
             pass
     return db

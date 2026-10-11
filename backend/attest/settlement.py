@@ -70,6 +70,8 @@ class Attestor(Protocol):
     def build_stake_tx(self, wallet: str, amount_base: int) -> bytes: ...
     def submit_stake(self, signed_tx: bytes, unsigned_tx: bytes) -> str: ...
     def faucet(self, wallet: str, lamports: int, amount_base: int) -> str: ...
+    def refund(self, wallet: str, amount_base: int) -> str: ...
+    def burn(self, amount_base: int) -> str: ...
 
 
 class UnconfiguredAttestor:
@@ -90,6 +92,12 @@ class UnconfiguredAttestor:
         raise RuntimeError("no reward pool configured")
 
     def faucet(self, wallet: str, lamports: int, amount_base: int) -> str:
+        raise RuntimeError("no reward pool configured")
+
+    def refund(self, wallet: str, amount_base: int) -> str:
+        raise RuntimeError("no reward pool configured")
+
+    def burn(self, amount_base: int) -> str:
         raise RuntimeError("no reward pool configured")
 
 
@@ -270,6 +278,24 @@ class SolanaAttestor:
         log.info("stake blockhash issued=%s signed=%s", issued.message.recent_blockhash, tx.message.recent_blockhash)
         sig = self._rpc("sendTransaction", [base64.b64encode(bytes(tx)).decode(),
                                             {"encoding": "base64", "preflightCommitment": "confirmed"}])
+        self.confirm(sig)
+        return sig
+
+    def burn(self, amount_base: int) -> str:
+        """Burn REWARD_MINT from the pool account (SPL BurnChecked; the attestor owns the pool)."""
+        me = self.keypair.pubkey()
+        ix = Instruction(TOKEN_PROGRAM, bytes([15]) + struct.pack("<Q", amount_base) + bytes([self.reward_decimals]), [
+            AccountMeta(associated_token_address(me, self.reward_mint), is_signer=False, is_writable=True),
+            AccountMeta(self.reward_mint, is_signer=False, is_writable=True),
+            AccountMeta(me, is_signer=True, is_writable=False)])
+        sig = self.send(ix)
+        self.confirm(sig)
+        return sig
+
+    def refund(self, wallet: str, amount_base: int) -> str:
+        """Return a No-Loss stake from the pool to its owner."""
+        sig = self.send(*reward_ixs(self.keypair.pubkey(), Pubkey.from_string(wallet), self.reward_mint,
+                                    amount_base, self.reward_decimals))
         self.confirm(sig)
         return sig
 

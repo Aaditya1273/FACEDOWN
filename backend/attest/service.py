@@ -78,12 +78,13 @@ class Attest:
 
     def _save_profile(self, p: Profile) -> None:
         self.db.execute(
-            "INSERT INTO profiles VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(wallet) DO UPDATE SET "
+            "INSERT INTO profiles (wallet, xp, verified_count, rejected_count, reputation, current_streak, "
+            "best_streak, last_day, freezes) VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(wallet) DO UPDATE SET "
             "xp=excluded.xp, verified_count=excluded.verified_count, rejected_count=excluded.rejected_count, "
             "reputation=excluded.reputation, current_streak=excluded.current_streak, "
-            "best_streak=excluded.best_streak, last_day=excluded.last_day",
+            "best_streak=excluded.best_streak, last_day=excluded.last_day, freezes=excluded.freezes",
             (p.wallet, p.xp, p.verified_count, p.rejected_count, p.reputation,
-             p.current_streak, p.best_streak, p.last_day))
+             p.current_streak, p.best_streak, p.last_day, p.freezes))
 
     def _rank(self, xp: int) -> int:
         return 1 + self.db.execute("SELECT COUNT(*) FROM profiles WHERE xp > ?", (xp,)).fetchone()[0]
@@ -100,18 +101,46 @@ class Attest:
     def _reject(self, row: sqlite3.Row, err: AttestError) -> None:
         p = self._profile(row["wallet"])
         p.rejected_count += 1
+        held = self._held_stake(row["id"]) / 10 ** self._decimals()
+        no_loss = self._mission(row["mission_id"]).no_loss
         with self.db:
             self._save_profile(p)
             self.db.execute("UPDATE sessions SET state='REJECTED', receipt=? WHERE id=?",
                             (json.dumps({"status": "REJECTED", "reason": err.reason, "detail": err.detail,
-                                         "stake_forfeited": self._held_stake(row["id"]) / 10 ** self._decimals()}),
+                                         "stake_forfeited": 0 if no_loss else held,
+                                         "stake_returned": held if no_loss else 0}),
                              row["id"]))
-            self.db.execute("UPDATE stakes SET status='FORFEITED' WHERE session_id=? AND status='HELD'", (row["id"],))
+            if not no_loss:
+                self.db.execute("UPDATE stakes SET status='FORFEITED' WHERE session_id=? AND status='HELD'", (row["id"],))
         event("rejected", row["id"], mission_id=row["mission_id"], reason=err.reason)
+        if no_loss:
+            self._refund_no_loss()
+
+    def _refund_no_loss(self) -> None:
+        """No-Loss stakes go back to their owner when a session fails or is abandoned until it expires.
+        A refund that fails on the network stays HELD and is retried on the next call."""
+        rows = self.db.execute(
+            "SELECT k.session_id, k.wallet, k.amount_base, k.mission_id FROM stakes k JOIN sessions s ON s.id=k.session_id "
+            "WHERE k.status='HELD' AND (s.state='REJECTED' OR (s.expires_at < ? AND s.state IN ('CREATED','ACTIVE','SUBMITTED')))",
+            (self.clock(),)).fetchall()
+        for r in rows:
+            m = self.missions.get(r["mission_id"])
+            if not (m and m.no_loss):
+                continue
+            try:
+                sig = self.attestor.refund(r["wallet"], r["amount_base"])
+            except Exception as e:  # network / RPC: retried next time
+                log.warning("no-loss refund for %s failed: %s", r["session_id"], e)
+                continue
+            with self.db:
+                self.db.execute("UPDATE stakes SET status='RETURNED', signature=COALESCE(signature, ?) "
+                                "WHERE session_id=? AND status='HELD'", (sig, r["session_id"]))
+            event("refunded", r["session_id"], mission_id=r["mission_id"], signature=sig)
 
     # ---------- protocol steps ----------
 
     def create_session(self, wallet: str, mission_id: str, ephemeral_pubkey: str) -> dict:
+        self._refund_no_loss()  # abandoned No-Loss sessions that have since expired
         policy = self._mission(mission_id)
         identity.decode_wallet(wallet)
         identity.load_ephemeral_key(ephemeral_pubkey)
@@ -377,6 +406,8 @@ class Attest:
 
     def _forfeited(self, mission_id: str) -> int:
         """Stakes lost to the pool: rejected sessions, plus held stakes whose session expired unfinished."""
+        if self.missions[mission_id].no_loss:
+            return 0
         return self.db.execute(
             "SELECT COALESCE(SUM(k.amount_base),0) FROM stakes k JOIN sessions s ON s.id = k.session_id "
             "WHERE k.mission_id=? AND (k.status='FORFEITED' OR (k.status='HELD' AND s.expires_at < ? "
@@ -445,6 +476,58 @@ class Attest:
             raise AttestError(Reason.INVALID_STATE, f"no receipt while session is {row['state']}")
         return {"state": row["state"], **json.loads(row["receipt"])}
 
+    FREEZE_PRICE = 2.0   # SKR per streak freeze
+    FREEZE_BURN = 0.5    # share of the price burned; the rest is protocol revenue (not credited to any pool)
+
+    def freeze_order(self, wallet: str) -> dict:
+        """Unsigned SKR transfer (user -> pool) for one streak freeze; the wallet signs it."""
+        identity.decode_wallet(wallet)
+        amount = round(self.FREEZE_PRICE * 10 ** self._decimals())
+        try:
+            tx = self.attestor.build_stake_tx(wallet, amount)
+        except Exception as e:
+            raise AttestError(Reason.NETWORK_ERROR, f"could not build the freeze transaction: {e}") from e
+        order_id = str(uuid.uuid4())
+        with self.db:
+            self.db.execute("INSERT INTO freeze_orders (id, wallet, amount_base, unsigned_tx, status, created_at) "
+                            "VALUES (?,?,?,?,'ISSUED',?)", (order_id, wallet, amount, tx, self.clock()))
+        return {"order_id": order_id, "transaction": base64.b64encode(tx).decode(), "price": self.FREEZE_PRICE,
+                "burn": self.FREEZE_PRICE * self.FREEZE_BURN, "symbol": self.symbol(next(iter(self.missions.values())))}
+
+    def freeze_pay(self, order_id: str, signed_tx_b64: str) -> dict:
+        """Submit the signed payment, burn half of it from the pool, credit one freeze."""
+        with self.lock:
+            row = self.db.execute("SELECT * FROM freeze_orders WHERE id=?", (order_id,)).fetchone()
+            if row is None:
+                raise AttestError(Reason.SESSION_NOT_FOUND, "no such freeze order")
+            if row["status"] != "ISSUED":
+                raise AttestError(Reason.INVALID_STATE, "freeze order already paid")
+            try:
+                pay_sig = self.attestor.submit_stake(base64.b64decode(signed_tx_b64), row["unsigned_tx"])
+            except Exception as e:
+                raise AttestError(Reason.STAKE_FAILED, str(e)) from e
+            burn = round(row["amount_base"] * self.FREEZE_BURN)
+            try:
+                burn_sig = self.attestor.burn(burn)
+            except Exception as e:  # paid but not burned: record it, the burn can be redone from the pool
+                log.warning("freeze burn failed for %s: %s", order_id, e)
+                burn_sig = None
+            p = self._profile(row["wallet"])
+            p.freezes += 1
+            with self.db:
+                self._save_profile(p)
+                self.db.execute("UPDATE freeze_orders SET status='PAID', payment_signature=?, burn_signature=? WHERE id=?",
+                                (pay_sig, burn_sig, order_id))
+        event("freeze_bought", None, burned_base=burn if burn_sig else 0)
+        return {"freezes": p.freezes, "payment_signature": pay_sig, "burn_signature": burn_sig,
+                "burned": burn / 10 ** self._decimals() if burn_sig else 0}
+
+    def live(self) -> dict:
+        """How many sessions are running right now (authorized, not yet submitted, not expired)."""
+        n = self.db.execute("SELECT COUNT(*) FROM sessions WHERE state='ACTIVE' AND expires_at > ?",
+                            (self.clock(),)).fetchone()[0]
+        return {"facedown_now": n}
+
     def history(self, wallet: str, limit: int = 30) -> list[dict]:
         """Finished sessions (verified or rejected), newest first, from the stored receipts only."""
         identity.decode_wallet(wallet)
@@ -461,6 +544,7 @@ class Attest:
                 "state": r["state"], "started_at": r["started_at"],
                 "duration_seconds": rc.get("duration_seconds", m.duration_seconds if m else 0),
                 "reason": rc.get("reason"), "stake_forfeited": rc.get("stake_forfeited", 0),
+                "stake_returned": rc.get("stake_returned", 0),
                 "paid": settlement.get("reward_token", 0),
                 "symbol": settlement.get("reward_symbol") or (self.symbol(m) if m else None),
                 "settlement_status": settlement.get("status"), "explorer_url": settlement.get("explorer_url"),

@@ -32,7 +32,9 @@ sealed interface Screen {
     ) : Screen
     data class Verifying(val checks: List<Check>) : Screen
     data class Result(val receipt: Receipt, val checkpointHashes: List<String>) : Screen
-    data class Failed(val reason: String, val detail: String, val stakeLost: String? = null) : Screen
+    /** [stakeLost]: forfeited to the pool. [stakeReturned]: a No-Loss stake on its way back. */
+    data class Failed(val reason: String, val detail: String, val stakeLost: String? = null,
+                      val stakeReturned: String? = null) : Screen
 }
 
 data class UiState(
@@ -46,6 +48,8 @@ data class UiState(
     val mission: MissionPolicy? = null,
     val profile: Profile? = null,
     val history: List<com.presence.attest.HistoryItem> = emptyList(),
+    /** Sessions running on the server right now, including yours. */
+    val facedownNow: Int = 0,
     val busy: Boolean = false,
     val message: String? = null,
 )

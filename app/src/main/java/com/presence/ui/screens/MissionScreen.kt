@@ -50,7 +50,8 @@ private fun Rule(text: String) = Row(Modifier.padding(vertical = 6.dp)) {
 @Composable
 fun MissionScreen(s: UiState, onBack: () -> Unit, onStart: () -> Unit) = Page {
     val m = s.mission ?: return@Page
-    val staked = m.stake.token > 0
+    val noLoss = m.stake.noLoss
+    val staked = m.stake.token > 0 && !noLoss  // money actually at risk
     val stake = "${formatToken(m.stake.token)} ${m.reward.symbol}"
     var consent by rememberSaveable { mutableStateOf(false) }
 
@@ -70,6 +71,14 @@ fun MissionScreen(s: UiState, onBack: () -> Unit, onStart: () -> Unit) = Page {
                 KeyValue("Stake", "None")
                 Hairline()
                 KeyValue("If you finish", "+${formatToken(m.reward.token)} ${m.reward.symbol} from the sponsor")
+            }
+            if (noLoss) {
+                Hairline()
+                KeyValue("Stake", "$stake, locked")
+                Hairline()
+                KeyValue("If you finish", "Stake back +${formatToken(m.reward.token)} ${m.reward.symbol}")
+                Hairline()
+                KeyValue("If you stop early", "Stake back, no reward")
             }
             if (staked) {
                 Hairline()
@@ -104,7 +113,7 @@ fun MissionScreen(s: UiState, onBack: () -> Unit, onStart: () -> Unit) = Page {
         Gap(24)
         SectionLabel("Next")
         Gap(8)
-        Text(if (staked) "Your wallet asks you to approve the sign-in and the $stake stake. Nothing moves until you approve."
+        Text(if (staked || noLoss) "Your wallet asks you to approve the sign-in and the $stake stake. Nothing moves until you approve."
             else "Your wallet asks you to sign in.",
             style = MaterialTheme.typography.bodyMedium, color = SemanticColors.SecondaryText)
         Gap(24)
@@ -132,6 +141,7 @@ fun MissionScreen(s: UiState, onBack: () -> Unit, onStart: () -> Unit) = Page {
         when {
             s.busy -> "Waiting for your wallet…"
             staked -> "Stake $stake & go facedown"
+            noLoss -> "Lock $stake & go facedown"
             else -> "Go facedown"
         },
         enabled = consent, loading = s.busy, onClick = onStart)

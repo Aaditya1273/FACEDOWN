@@ -37,7 +37,9 @@ data class Reward(
     val bonus: Double = 0.0,
 )
 
-@Serializable data class StakeTerms(val token: Double = 0.0, @SerialName("bonus_rate") val bonusRate: Double = 0.0)
+@Serializable data class StakeTerms(val token: Double = 0.0, @SerialName("bonus_rate") val bonusRate: Double = 0.0,
+                                   /** Returned whether you finish or not; only finishers earn. */
+                                   @SerialName("no_loss") val noLoss: Boolean = false)
 
 @Serializable data class StakeOffer(val amount: Double, val symbol: String, val transaction: String)
 
@@ -86,7 +88,16 @@ data class Profile(
     val reputation: Int,
     @SerialName("proved_today") val provedToday: Boolean,
     @SerialName("claims_today") val claimsToday: Map<String, Int> = emptyMap(),
+    @SerialName("streak_freezes") val streakFreezes: Int = 0,
 )
+
+@Serializable
+data class FreezeOrder(@SerialName("order_id") val orderId: String, val transaction: String, val price: Double,
+                       val burn: Double, val symbol: String)
+
+@Serializable
+data class FreezePaid(val freezes: Int, @SerialName("burn_signature") val burnSignature: String? = null,
+                      val burned: Double = 0.0)
 
 /** One finished session from GET /history/{wallet}; every field comes from the stored server receipt. */
 @Serializable
@@ -98,6 +109,7 @@ data class HistoryItem(
     @SerialName("duration_seconds") val durationSeconds: Double = 0.0,
     val reason: String? = null,
     @SerialName("stake_forfeited") val stakeForfeited: Double = 0.0,
+    @SerialName("stake_returned") val stakeReturned: Double = 0.0,
     val paid: Double = 0.0,
     val symbol: String? = null,
     @SerialName("settlement_status") val settlementStatus: String? = null,
@@ -155,6 +167,7 @@ class AttestApi @Inject constructor(@PublishedApi internal val http: HttpClient)
     suspend fun missions(): List<MissionPolicy> = get("/missions")
     suspend fun profile(wallet: String): Profile = get("/profile/$wallet")
     suspend fun history(wallet: String): List<HistoryItem> = get("/history/$wallet")
+    suspend fun live(): Live = get("/live")
 
     suspend fun createSession(wallet: String, missionId: String, ephemeralPubkey: String): SessionCreated =
         post("/session", mapOf("wallet" to wallet, "mission_id" to missionId, "ephemeral_pubkey" to ephemeralPubkey))
@@ -166,6 +179,10 @@ class AttestApi @Inject constructor(@PublishedApi internal val http: HttpClient)
     suspend fun pools(): Pools = get("/sponsor/pools")
 
     /** DEVELOPMENT ONLY (server refuses on mainnet): fee SOL + test tokens for a new test wallet. */
+    suspend fun freezeOrder(wallet: String): FreezeOrder = post("/streak/freeze", mapOf("wallet" to wallet))
+    suspend fun freezePay(orderId: String, signedTxB64: String): FreezePaid =
+        post("/streak/freeze/$orderId", mapOf("signature" to "-", "stake_transaction" to signedTxB64))
+
     suspend fun faucet(wallet: String) {
         call { http.post("$base/dev/faucet") { jsonBody(json.encodeToString(mapOf("wallet" to wallet))) } }
     }
@@ -210,6 +227,8 @@ class AttestApi @Inject constructor(@PublishedApi internal val http: HttpClient)
         return text
     }
 }
+
+@Serializable data class Live(@SerialName("facedown_now") val facedownNow: Int = 0)
 
 @Serializable
 data class CheckpointBody(

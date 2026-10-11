@@ -148,6 +148,18 @@ def create_app(service: Attest | None = None) -> FastAPI:
     def profile(wallet: str):
         return svc.profile(wallet)
 
+    @app.post("/streak/freeze")
+    def freeze_order(body: Faucet):
+        return svc.freeze_order(body.wallet)
+
+    @app.post("/streak/freeze/{order_id}")
+    def freeze_pay(order_id: str, body: Authorize):
+        return svc.freeze_pay(order_id, body.stake_transaction or "")
+
+    @app.get("/live")
+    def live():
+        return svc.live()
+
     @app.get("/history/{wallet}")
     def history(wallet: str):
         return svc.history(wallet)

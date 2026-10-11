@@ -89,10 +89,10 @@ def approve_wallet(timeout: float = 60) -> None:
 
 
 def run_mission(skip_window: int | None = None, leave_at: float | None = None, duration: str = "2 min",
-                stake: str | None = "Stake 1 SKR-TEST") -> str:
+                stake: str | None = "Stake 1") -> str:
     """stake=None runs the free, sponsor-funded variant."""
     tap(duration)                     # duration selector on Today
-    tap(stake or "Free")              # stake selector on Today
+    tap(stake or "Free")              # stake selector on Today: Free | No-Loss | Stake 1
     tap("Go facedown  →")
     tap("During the session")         # consent row
     tap("& go facedown" if stake else "Go facedown")  # "Stake 1 SKR-TEST & go facedown" / "Go facedown"
