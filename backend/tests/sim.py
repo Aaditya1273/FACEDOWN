@@ -56,9 +56,9 @@ class SimSession:
     def next_checkpoint(self, t_ms: int, interactions: int = 2, foreground: bool = True,
                         response_ms: int | None = None, still_pct: int = 92, touch_motion: int | None = None) -> dict:
         # Human-like by default: answers to an unpredictable prompt take ~0.4–1.8 s and vary, the phone
-        # mostly lies still, and each tap jolts it a little.
+        # mostly lies still face-down, and each knock jolts it.
         rt = response_ms if response_ms is not None else (random.randint(400, 1800) if interactions else -1)
-        tm = touch_motion if touch_motion is not None else (random.randint(120, 600) if interactions else -1)
+        tm = touch_motion if touch_motion is not None else (random.randint(400, 3000) if interactions else -1)
         cp = CheckpointData(self.index, t_ms, (self.index + 1) * 10_000, foreground, interactions, rt, still_pct, tm)
         self.head = evidence.checkpoint_hash(self.head, cp, self.nonce)
         self.index += 1
