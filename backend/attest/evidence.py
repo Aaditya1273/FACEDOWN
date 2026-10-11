@@ -6,8 +6,8 @@ payload_i    = "{index}|{timestamp_ms}|{elapsed_ms}|{foreground 0/1}|{interactio
 root         = SHA256("PRESENCE/root/v1" | last_checkpoint_hash | witness_root)
 
 response_ms is how long the presence check was on screen before it was answered (-1 = not answered).
-still_pct is the share of the window the phone lay still (accelerometer), taps excluded; -1 = no sensor.
-touch_motion is the largest physical jolt (mm/s^2) the accelerometer felt at an "I'm here" tap; -1 = no
+still_pct is the share of the window the phone lay still and face-down (accelerometer), check-ins excluded; -1 = no sensor.
+touch_motion is the largest physical jolt (mm/s^2) of a check-in (a knock on the back, or a finger tap); -1 = no
 tap or no sensor. A finger moves the phone; an injected tap (script, AI agent) doesn't.
 
 `|` is the literal byte 0x7C; hashes are raw 32-byte digests. witness_root is 32 zero

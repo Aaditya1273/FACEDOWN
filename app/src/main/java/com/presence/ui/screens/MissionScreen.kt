@@ -66,7 +66,7 @@ fun MissionScreen(s: UiState, onBack: () -> Unit, onStart: () -> Unit) = Page {
             KeyValue("Duration", minutesLabel(m.durationSeconds))
             Hairline()
             KeyValue("Check-ins", "${m.requiredCheckpoints}, one every ${minutesLabel(m.checkpointIntervalSeconds)}")
-            if (!staked && m.reward.token > 0) {
+            if (!staked && !noLoss && m.reward.token > 0) {
                 Hairline()
                 KeyValue("Stake", "None")
                 Hairline()
