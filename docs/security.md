@@ -12,7 +12,7 @@
 | **Session theft** | Every checkpoint and the root are signed by a per-session Android Keystore key whose fingerprint the wallet signed | Not hardware attestation; a rooted device can extract keys from software keystores |
 | **Wrong-wallet SGT** | SGT check runs on the wallet that signed the SIWS message, never on a client-supplied address | — |
 | **Witness collusion** | N/A: P3 not implemented | — |
-| **Privacy leakage** | Counts only, no location/sensors; only a 32-byte root on-chain | Wallet address ↔ daily activity is public on-chain by design |
+| **Privacy leakage** | Counts plus two motion summaries per window; no raw sensor data, no location; only a 32-byte root on-chain | Wallet address ↔ daily activity is public on-chain by design |
 | **Stake swapped by a client** | ATTEST builds the stake transfer and only submits a signed transaction whose message is byte-identical to the one it issued (`submit_stake`) | — |
 | **Draining the bonus pool** | Bonus ≤ `stake × bonus_rate` and ≤ pool balance; one claim index per Seeker per mission per day; quitting forfeits the stake | Dev mode keys claims by wallet |
 | **Stake lost to a race** | Claim limit is checked before the stake is submitted and again after | A concurrent claim between the checks leaves the stake to forfeit at expiry (documented `ponytail:` note) |
@@ -33,6 +33,12 @@ hash-chained checkpoint. `anomaly.assess` (statistics, not machine learning) sco
 
 A risk score ≥ 0.9 rejects the run with `AUTOMATION_DETECTED`. This catches naive scripts. **A script that
 injects human-like random delays defeats it.** It raises the cost of farming; it does not prevent it.
+
+**Physical evidence (production).** Each "I'm here" tap must also jolt the accelerometer (`min_touch_motion`), and the
+phone must lie still most of each window (`min_still_pct`). Injected input from adb, an accessibility service or an AI
+phone agent doesn't move the device, so it fails with `AUTOMATION_DETECTED`; on the emulator this is reproducible
+(`ATTEST_ENFORCE_PHYSICAL=true scripts/dev_stack.sh`, then `scripts/device_e2e.py emulator-5554 free`). It does not stop
+a modified app that fabricates the two numbers, or a mechanical tapper: that needs hardware attestation (P4), not built.
 
 ## Honest limitations
 

@@ -4,6 +4,7 @@
 
 Needs: ATTEST running on the host (:8787), `adb reverse tcp:8787 tcp:8787`, both apps installed.
 """
+import html
 import re
 import subprocess
 import sys
@@ -25,7 +26,7 @@ def screen() -> list[tuple[str, tuple[int, int]]]:
     out = []
     for text, x1, y1, x2, y2 in re.findall(
             r'text="([^"]*)"[^>]*?bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', xml):
-        out.append((text.replace("&#10;", " "), ((int(x1) + int(x2)) // 2, (int(y1) + int(y2)) // 2)))
+        out.append((html.unescape(text).replace("\n", " "), ((int(x1) + int(x2)) // 2, (int(y1) + int(y2)) // 2)))
     return out
 
 
@@ -71,19 +72,24 @@ def fresh_identity() -> None:
     adb("shell", "am", "start", "-n", "com.presence/.MainActivity")
     tap("Connect wallet")
     tap("AUTHORIZE")
-    wait_for("Clock in")
+    wait_for("Clock in  →")
 
 
-def run_mission(skip_window: int | None = None, leave_at: float | None = None, mission: str = "Quick Clock-In") -> str:
-    tap(mission)
+def run_mission(skip_window: int | None = None, leave_at: float | None = None, duration: str = "2 min",
+                stake: str | None = "Stake 1 SKR-TEST") -> str:
+    """stake=None runs the free, sponsor-funded variant."""
+    tap(duration)                     # duration selector on Today
+    tap(stake or "Free")              # stake selector on Today
+    tap("Clock in  →")
     tap("During the session")         # consent row
-    tap("clock in")                   # "Stake 1 & clock in"
+    tap("& clock in" if stake else "Clock in")  # "Stake 1 SKR-TEST & clock in" / "Clock in"
     tap("AUTHORIZE")                  # wallet signs the SIWS message...
-    tap("AUTHORIZE")                  # ...and the stake transaction, in the same wallet session
-    wait_for("Evidence chain", 90)    # stake confirmation + countdown, then the active session
+    if stake:
+        tap("AUTHORIZE")              # ...and the stake transaction, in the same wallet session
+    wait_for(" goal", 90)      # stake confirmation + countdown, then the active session
     start = time.time()
     left = False
-    while time.time() - start < 200 and find("Evidence chain"):  # answer each presence check as it appears
+    while time.time() - start < 200 and find(" goal"):  # answer each presence check as it appears
         elapsed = time.time() - start
         if leave_at is not None and not left and elapsed > leave_at:
             adb("shell", "input", "keyevent", "KEYCODE_HOME")
@@ -96,7 +102,7 @@ def run_mission(skip_window: int | None = None, leave_at: float | None = None, m
     end = time.time() + 60
     while time.time() < end:
         t = texts()
-        if "VERIFIED ✓" in t or "NOT VERIFIED" in t:
+        if "You kept your commitment" in t or "Session not verified" in t:
             return t
         time.sleep(1)
     raise SystemExit(f"no result; screen: {texts()}")
@@ -119,6 +125,10 @@ def main() -> None:
                 tap("Done")
                 time.sleep(2)
             print("home:", texts())
+        elif scenario == "free":       # no stake: a sponsor pays the reward
+            fresh_identity()
+            print(run_mission(stake=None))
+            tap("Done")
         elif scenario == "again":      # same wallet, same day
             adb("shell", "am", "start", "-n", "com.presence/.MainActivity")
             time.sleep(2)
@@ -126,11 +136,11 @@ def main() -> None:
         elif scenario == "leave":
             fresh_identity()
             print(run_mission(leave_at=40))
-            tap("Home")
+            tap("Back to Today")
         elif scenario == "skip":
             fresh_identity()
             print(run_mission(skip_window=3))
-            tap("Home")
+            tap("Back to Today")
     adb("shell", "svc", "power", "stayon", "false")
 
 

@@ -17,8 +17,8 @@
 
 ```text
 genesis      = SHA256("PRESENCE/genesis/v1" | session_id | nonce)
-checkpoint_i = SHA256("PRESENCE/cp/v2" | prev_hash | payload_i | nonce)
-payload_i    = "{index}|{timestamp_ms}|{elapsed_ms}|{foreground 0/1}|{interactions}|{response_ms}"
+checkpoint_i = SHA256("PRESENCE/cp/v3" | prev_hash | payload_i | nonce)
+payload_i    = "{index}|{timestamp_ms}|{elapsed_ms}|{foreground 0/1}|{interactions}|{response_ms}|{still_pct}|{touch_motion}"
 root         = SHA256("PRESENCE/root/v1" | last_checkpoint_hash | witness_root)
 ```
 
@@ -57,5 +57,12 @@ sequenceDiagram
 ## What a checkpoint contains
 
 Only counts and booleans for a 10-second window: whether the session left the foreground, how many times the user
-answered the presence check, and how long the check was on screen before the first answer (`response_ms`, -1 if unanswered). No coordinates, no raw touch streams, no sensors, no location.
+answered the presence check, and how long the check was on screen before the first answer (`response_ms`, -1 if unanswered).
+Two accelerometer summaries (`MotionProbe.kt`): `still_pct`, the share of 1-second buckets in which the phone lay still
+(the seconds around a tap excluded), and `touch_motion`, the largest jolt in mm/s² felt within 300 ms of an "I'm here"
+tap. A finger on the glass moves the phone a little; input injected by a script or an AI agent moves nothing (see
+arXiv 2609.02154 for motion separating human from agent-driven taps). Raw samples never leave the phone. No coordinates,
+no raw touch streams, no location. Missions set `min_still_pct` / `min_touch_motion`; production enforces them,
+development only reports them (`ATTEST_ENFORCE_PHYSICAL` overrides), because emulators have no real motion. The
+thresholds are uncalibrated on real devices.
 These are **continuity and fraud signals**, not identity.
