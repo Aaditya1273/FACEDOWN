@@ -111,7 +111,7 @@ def test_missing_interaction_and_background_fail(api, clock, device):
 
 def test_wrong_assurance_fails(svc):
     policy = svc.missions[MISSION]
-    cps = [ObservedCheckpoint(i, 30.0 * (i + 1), True, 1, 700 + 150 * i) for i in range(4)]
+    cps = [ObservedCheckpoint(i, 30.0 * (i + 1), True, 1, 700 + 150 * i, 90, 200) for i in range(4)]
     with pytest.raises(AttestError) as e:
         evaluate(policy, 0, 120, cps, achieved_assurance=1)
     assert e.value.reason == Reason.POLICY_NOT_SATISFIED
@@ -153,7 +153,8 @@ def test_siws_message_binds_nonce_and_ephemeral_key(api, device):
 
 def test_evidence_chain_golden_vector():
     """Shared with Android EvidenceChainTest.kt: both implementations must produce these bytes."""
-    cps = [CheckpointData(i, 1_700_000_000_000 + i * 10_000, (i + 1) * 10_000, True, 2, 700 + i * 100) for i in range(6)]
+    cps = [CheckpointData(i, 1_700_000_000_000 + i * 10_000, (i + 1) * 10_000, True, 2, 700 + i * 100, 90 + i, 150 + i * 10)
+           for i in range(6)]
     hashes = evidence.chain("session-1", "nonce-1", cps)
     assert evidence.genesis("session-1", "nonce-1").hex() == GOLDEN_GENESIS
     assert hashes[0].hex() == GOLDEN_CP0
@@ -161,5 +162,41 @@ def test_evidence_chain_golden_vector():
 
 
 GOLDEN_GENESIS = "c52244702ffcfcac1b4198db2c0c1f086640a36441c9bd265217dec3fae9a5ef"
-GOLDEN_CP0 = "296120d3f97cbd8a1a082fc4990f18dcb1e8068d36fdea928169286c527ee07e"
-GOLDEN_ROOT = "4cf4a2f0811cc0fcad119242576453a92ae0572475e2e5573741be4f1b1ef1bc"
+GOLDEN_CP0 = "b5312383492ebad14201269cbb6fbfa77c391156fe826ec187a083a10846b811"
+GOLDEN_ROOT = "189610d148640d4be13c7399bf39f83329d1b0d014e50e513aa2bfeddbeaaffb"
+
+
+def test_injected_taps_are_caught_when_physical_evidence_is_enforced(api, svc, clock, device):
+    """An "I'm here" tap that didn't move the phone (a script or AI agent injecting input) fails."""
+    svc.enforce_physical = True
+    sess = start(api, device)
+    run_process(api, sess, clock, touch_motion=0)
+    body = submit_and_verify(api, sess).json()
+    assert body["verified"] is False and body["reason"] == "AUTOMATION_DETECTED"
+    assert "no finger touched it" in body["detail"]
+
+
+def test_phone_picked_up_fails_when_enforced(api, svc, clock, device):
+    svc.enforce_physical = True
+    sess = start(api, device)
+    run_process(api, sess, clock, still_pct=20)
+    body = submit_and_verify(api, sess).json()
+    assert body["verified"] is False and body["reason"] == "POLICY_NOT_SATISFIED"
+    assert "phone still 20%" in body["detail"]
+
+
+def test_human_session_passes_physical_checks_and_receipt_says_so(api, svc, clock, device):
+    svc.enforce_physical = True
+    sess = start(api, device)
+    run_process(api, sess, clock)
+    rc = submit_and_verify(api, sess).json()["receipt"]
+    assert rc["checks"]["human_touch"] == "PASSED" and rc["checks"]["phone_down"] == "PASSED"
+    assert rc["physical"]["still_pct"] == [92] * 4
+
+
+def test_development_reports_physical_problems_without_failing(api, clock, device):
+    """Emulators have no real motion: development flags it in the receipt instead of rejecting."""
+    sess = start(api, device)
+    run_process(api, sess, clock, touch_motion=0)
+    body = submit_and_verify(api, sess).json()
+    assert body["verified"] is True and body["receipt"]["checks"]["human_touch"] == "FLAGGED"

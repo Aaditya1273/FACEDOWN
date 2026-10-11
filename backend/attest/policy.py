@@ -31,6 +31,9 @@ class MissionPolicy:
     sponsor: str = ""
     why: str = ""
     timing_tolerance_seconds: int = 3
+    # Physical evidence (accelerometer). 0 disables a rule. Thresholds need calibration on real phones.
+    min_still_pct: int = 0        # each window, the phone lay still at least this share of the time
+    min_touch_motion: int = 0     # each "I'm here" tap jolted the phone at least this much (mm/s^2)
     extra: dict = field(default_factory=dict)
 
     @property
@@ -54,6 +57,7 @@ class MissionPolicy:
             "stake": {"token": self.stake_token, "bonus_rate": self.bonus_rate},
             "sponsor": self.sponsor,
             "why": self.why,
+            "physical": {"min_still_pct": self.min_still_pct, "min_touch_motion": self.min_touch_motion},
         }
 
 
@@ -86,6 +90,8 @@ def build_policy(m: dict) -> MissionPolicy:
         raise ValueError(f"{p.mission_id}: max claims per day must be 1..255 (on-chain claim index is a u8)")
     if not 0 <= p.bonus_rate <= 1:
         raise ValueError(f"{p.mission_id}: bonus_rate must be within 0..1")
+    if not 0 <= p.min_still_pct <= 100 or p.min_touch_motion < 0:
+        raise ValueError(f"{p.mission_id}: min_still_pct must be 0..100 and min_touch_motion >= 0")
     if p.reward_token < 0 or p.reward_xp < 0 or p.stake_token < 0:
         raise ValueError(f"{p.mission_id}: rewards cannot be negative")
     return p
@@ -98,14 +104,31 @@ class ObservedCheckpoint:
     foreground: bool
     interactions: int
     response_ms: int = -1
+    still_pct: int = -1
+    touch_motion: int = -1
+
+
+def physical(policy: MissionPolicy, checkpoints: list[ObservedCheckpoint]) -> dict[str, list[str]]:
+    """Problems with the physical evidence, per rule. Empty lists = passed (or the rule is off)."""
+    touch, still = [], []
+    for cp in checkpoints:
+        if policy.min_touch_motion and cp.interactions > 0 and cp.touch_motion < policy.min_touch_motion:
+            touch.append(f"checkpoint {cp.index}: tap moved the phone {max(cp.touch_motion, 0)} mm/s^2 "
+                         f"(< {policy.min_touch_motion}); no finger touched it")
+        if policy.min_still_pct and cp.still_pct < policy.min_still_pct:
+            still.append(f"checkpoint {cp.index}: phone still {max(cp.still_pct, 0)}% of the time "
+                         f"(< {policy.min_still_pct}%)")
+    return {"human_touch": touch, "phone_down": still}
 
 
 def evaluate(policy: MissionPolicy, started_at: float, submitted_at: float,
-             checkpoints: list[ObservedCheckpoint], achieved_assurance: int) -> None:
-    """Raise POLICY_NOT_SATISFIED with every violated rule; return None on pass.
+             checkpoints: list[ObservedCheckpoint], achieved_assurance: int,
+             enforce_physical: bool = True) -> dict[str, str]:
+    """Raise with every violated rule; on pass return the physical-check results for the receipt.
 
     All timing uses the server clock (authorize -> each checkpoint receipt -> submit),
-    so a client cannot compress or backdate the process.
+    so a client cannot compress or backdate the process. With enforce_physical=False
+    (development: emulators have no real motion) physical problems are reported, not fatal.
     """
     problems = []
     tol = policy.timing_tolerance_seconds
@@ -134,3 +157,11 @@ def evaluate(policy: MissionPolicy, started_at: float, submitted_at: float,
     a = anomaly.assess([cp.response_ms for cp in checkpoints])
     if a.risk >= anomaly.THRESHOLD:
         raise AttestError(Reason.AUTOMATION_DETECTED, f"risk {a.risk}: " + "; ".join(a.reasons))
+
+    found = physical(policy, checkpoints)
+    if enforce_physical and found["human_touch"]:
+        raise AttestError(Reason.AUTOMATION_DETECTED, "; ".join(found["human_touch"]))
+    if enforce_physical and found["phone_down"]:
+        raise AttestError(Reason.POLICY_NOT_SATISFIED, "; ".join(found["phone_down"]))
+    off = {"human_touch": not policy.min_touch_motion, "phone_down": not policy.min_still_pct}
+    return {k: "NOT_REQUIRED" if off[k] else "FLAGGED" if v else "PASSED" for k, v in found.items()}

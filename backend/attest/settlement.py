@@ -7,6 +7,7 @@ attestor's associated token account for REWARD_MINT.
 """
 
 import base64
+import logging
 import hashlib
 import json
 import struct
@@ -16,6 +17,7 @@ from pathlib import Path
 from typing import Protocol
 
 import httpx
+from solders.compute_budget import ID as COMPUTE_BUDGET_ID
 from solders.hash import Hash
 from solders.instruction import AccountMeta, Instruction
 from solders.keypair import Keypair
@@ -23,6 +25,8 @@ from solders.message import Message
 from solders.pubkey import Pubkey
 from solders.system_program import ID as SYSTEM_PROGRAM_ID
 from solders.transaction import Transaction
+
+log = logging.getLogger("attest")
 
 TOKEN_PROGRAM = Pubkey.from_string("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")
 ATA_PROGRAM = Pubkey.from_string("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL")
@@ -87,6 +91,28 @@ class UnconfiguredAttestor:
 
     def faucet(self, wallet: str, lamports: int, amount_base: int) -> str:
         raise RuntimeError("no reward pool configured")
+
+
+def _instructions(m: Message) -> list[tuple]:
+    """(program, [(account, signer, writable)], data) per instruction, independent of account ordering."""
+    h, keys = m.header, m.account_keys
+    signed, ro_signed, ro_unsigned = (h.num_required_signatures, h.num_readonly_signed_accounts,
+                                      h.num_readonly_unsigned_accounts)
+    def writable(i: int) -> bool:
+        return i < signed - ro_signed if i < signed else i < len(keys) - ro_unsigned
+    return [(keys[ix.program_id_index], [(keys[a], a < signed, writable(a)) for a in ix.accounts], bytes(ix.data))
+            for ix in m.instructions]
+
+
+def stake_tampering(signed: Message, issued: Message) -> str | None:
+    """Why a wallet-signed stake isn't the one we issued, or None. Wallets (Solflare, Phantom) add
+    compute-budget instructions for priority fees and may refresh the blockhash; both only cost the
+    user's fee. Payer, programs, accounts, amounts and every other instruction must be identical."""
+    if signed.account_keys[0] != issued.account_keys[0]:
+        return "fee payer changed"
+    ours = _instructions(issued)
+    theirs = [ix for ix in _instructions(signed) if ix[0] != COMPUTE_BUDGET_ID]
+    return None if theirs == ours else "instructions changed"
 
 
 def _discriminator(name: str) -> bytes:
@@ -223,22 +249,25 @@ class SolanaAttestor:
         except (httpx.HTTPError, RuntimeError, KeyError, ValueError) as e:
             return Settlement(status="FAILED", network=self.network, detail=str(e)[:300])
 
-    def _blockhash(self) -> Hash:
-        return Hash.from_string(self._rpc("getLatestBlockhash", [{"commitment": "confirmed"}])["value"]["blockhash"])
+    def _blockhash(self, commitment: str = "confirmed") -> Hash:
+        return Hash.from_string(self._rpc("getLatestBlockhash", [{"commitment": commitment}])["value"]["blockhash"])
 
     def build_stake_tx(self, wallet: str, amount_base: int) -> bytes:
         """Unsigned SPL transfer of the stake from the user to the pool. The user pays its fee and signs
-        it in their wallet; ATTEST only submits it if it is byte-for-byte the message built here."""
+        it in their wallet; ATTEST only submits it if it moves exactly what was built here (stake_tampering).
+        The blockhash is finalized: Solflare checks it against its own RPC to tell the cluster, and a
+        just-confirmed hash its node hasn't seen yet reads as "this transaction is for mainnet"."""
         user = Pubkey.from_string(wallet)
         ix = transfer_checked_ix(associated_token_address(user, self.reward_mint), self.reward_mint, self.pool,
                                  user, amount_base, self.reward_decimals)
-        return bytes(Transaction.new_unsigned(Message.new_with_blockhash([ix], user, self._blockhash())))
+        return bytes(Transaction.new_unsigned(Message.new_with_blockhash([ix], user, self._blockhash("finalized"))))
 
     def submit_stake(self, signed_tx: bytes, unsigned_tx: bytes) -> str:
         tx, issued = Transaction.from_bytes(signed_tx), Transaction.from_bytes(unsigned_tx)
-        if tx.message != issued.message:
-            raise ValueError("signed transaction differs from the stake transaction ATTEST issued")
+        if problem := stake_tampering(tx.message, issued.message):
+            raise ValueError(f"signed transaction differs from the stake transaction ATTEST issued: {problem}")
         tx.verify()  # raises if the user's signature is missing or invalid
+        log.info("stake blockhash issued=%s signed=%s", issued.message.recent_blockhash, tx.message.recent_blockhash)
         sig = self._rpc("sendTransaction", [base64.b64encode(bytes(tx)).decode(),
                                             {"encoding": "base64", "preflightCommitment": "confirmed"}])
         self.confirm(sig)

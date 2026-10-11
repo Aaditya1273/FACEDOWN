@@ -30,6 +30,8 @@ CREATE TABLE IF NOT EXISTS checkpoints (
   foreground INTEGER NOT NULL,
   interactions INTEGER NOT NULL,
   response_ms INTEGER NOT NULL,
+  still_pct INTEGER NOT NULL DEFAULT -1,
+  touch_motion INTEGER NOT NULL DEFAULT -1,
   hash BLOB NOT NULL,
   received_at REAL NOT NULL,
   PRIMARY KEY (session_id, idx)
@@ -89,4 +91,9 @@ def connect(path: str | Path) -> sqlite3.Connection:
     db.execute("PRAGMA journal_mode=WAL")
     db.execute("PRAGMA foreign_keys=ON")
     db.executescript(SCHEMA)
+    for col in ("still_pct", "touch_motion"):  # databases created before physical evidence existed
+        try:
+            db.execute(f"ALTER TABLE checkpoints ADD COLUMN {col} INTEGER NOT NULL DEFAULT -1")
+        except sqlite3.OperationalError:
+            pass
     return db

@@ -26,6 +26,7 @@ class Settings:
     attestor_keypair: str | None
     reward_mint: str | None
     reward_decimals: int
+    enforce_physical: bool | None = None  # None: enforce in production, report-only in development
 
     @property
     def chain_id(self) -> str:
@@ -50,4 +51,5 @@ class Settings:
             attestor_keypair=os.environ.get("ATTESTOR_KEYPAIR") or None,
             reward_mint=os.environ.get("REWARD_MINT") or None,
             reward_decimals=int(os.environ.get("REWARD_DECIMALS", "6")),
+            enforce_physical=_bool("ATTEST_ENFORCE_PHYSICAL") if "ATTEST_ENFORCE_PHYSICAL" in os.environ else None,
         )

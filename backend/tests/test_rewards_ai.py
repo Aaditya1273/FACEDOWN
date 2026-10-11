@@ -134,3 +134,19 @@ def test_policies_the_engine_cannot_enforce_are_rejected():
         build_policy({**m, "duration_seconds": m["duration_seconds"] + 7})
     with pytest.raises(ValueError):
         build_policy({**m, "stake": {"token": 1, "bonus_rate": 2}})
+
+
+def test_history_lists_finished_sessions_newest_first(api, clock, attestor):
+    quitter = SimDevice()
+    q = start(api, quitter)
+    run_process(api, q, clock, foreground=False)
+    submit_and_verify(api, q)
+    clock.t += 3600
+    f = start(api, quitter)
+    run_process(api, f, clock)
+    submit_and_verify(api, f)
+    h = api.get(f"/history/{quitter.wallet}").json()
+    assert [x["state"] for x in h] == ["SETTLED", "REJECTED"]
+    assert h[0]["paid"] == 1.2 and h[1]["stake_forfeited"] == 1.0
+    assert h[1]["symbol"] == "SKR-TEST"  # rejected receipts carry no settlement, so it comes from the mission
+    assert api.get(f"/history/{SimDevice().wallet}").json() == []

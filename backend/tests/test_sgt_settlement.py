@@ -146,3 +146,25 @@ def test_localnet_stake_round_trip():
                                      reward_base=1_200_000))  # stake 1 + bonus 0.2
     assert res.status == "CONFIRMED", res.detail
     assert bal() == "50.2"
+
+
+def test_stake_accepts_wallet_priority_fees_but_nothing_else():
+    """Solflare adds compute-budget instructions and may refresh the blockhash; any other change is refused."""
+    from solders.compute_budget import set_compute_unit_limit, set_compute_unit_price
+    from solders.hash import Hash
+    from solders.keypair import Keypair
+    from solders.message import Message
+
+    from attest.settlement import stake_tampering, transfer_checked_ix
+
+    user, mint, pool, thief = (Keypair().pubkey() for _ in range(4))
+    stake = transfer_checked_ix(pool, mint, pool, user, 1_000_000, 6)
+    issued = Message.new_with_blockhash([stake], user, Hash.new_unique())
+    wallet = Message.new_with_blockhash([set_compute_unit_limit(200_000), set_compute_unit_price(5_000), stake],
+                                        user, Hash.new_unique())
+    assert stake_tampering(wallet, issued) is None
+    bigger = transfer_checked_ix(pool, mint, pool, user, 9_000_000, 6)
+    assert stake_tampering(Message.new_with_blockhash([bigger], user, Hash.new_unique()), issued) == "instructions changed"
+    elsewhere = transfer_checked_ix(pool, mint, thief, user, 1_000_000, 6)
+    assert stake_tampering(Message.new_with_blockhash([elsewhere], user, Hash.new_unique()), issued) == "instructions changed"
+    assert stake_tampering(Message.new_with_blockhash([stake], thief, Hash.new_unique()), issued) == "fee payer changed"

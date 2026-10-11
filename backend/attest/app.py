@@ -34,6 +34,8 @@ class Checkpoint(BaseModel):
     foreground: bool
     interactions: int = Field(ge=0, le=100_000)
     response_ms: int = Field(ge=-1, le=600_000)
+    still_pct: int = Field(-1, ge=-1, le=100)
+    touch_motion: int = Field(-1, ge=-1, le=1_000_000)
     hash: str = Field(pattern="^[0-9a-f]{64}$")
     signature: str = Field(description="base64 DER ECDSA(P-256, SHA-256) over the raw hash bytes")
 
@@ -67,7 +69,7 @@ def build_service(s: Settings) -> Attest:
                 if s.program_id and s.attestor_keypair else UnconfiguredAttestor())
     return Attest(store.connect(s.db_path), load_missions(s.missions_path), sgt, attestor,
                   domain=s.domain, chain_id=s.chain_id, dev_mode=s.dev_mode, network=s.network,
-                  ttl_seconds=s.session_ttl_seconds)
+                  ttl_seconds=s.session_ttl_seconds, enforce_physical=s.enforce_physical)
 
 
 def create_app(service: Attest | None = None) -> FastAPI:
@@ -82,7 +84,8 @@ def create_app(service: Attest | None = None) -> FastAPI:
     @app.get("/health")
     def health():
         return {"ok": True, "mode": "development" if svc.dev_mode else "production",
-                "network": svc.network, "settlement": type(svc.attestor).__name__}
+                "network": svc.network, "settlement": type(svc.attestor).__name__,
+                "physical": "enforced" if svc.enforce_physical else "reported"}
 
     @app.get("/missions")
     def missions():
@@ -100,7 +103,7 @@ def create_app(service: Attest | None = None) -> FastAPI:
     @app.post("/session/{session_id}/checkpoint")
     def checkpoint(session_id: str, body: Checkpoint):
         cp = CheckpointData(body.index, body.timestamp_ms, body.elapsed_ms, body.foreground, body.interactions,
-                            body.response_ms)
+                            body.response_ms, body.still_pct, body.touch_motion)
         return svc.add_checkpoint(session_id, cp, body.hash, body.signature)
 
     @app.post("/session/{session_id}/evidence")
@@ -144,6 +147,10 @@ def create_app(service: Attest | None = None) -> FastAPI:
     @app.get("/profile/{wallet}")
     def profile(wallet: str):
         return svc.profile(wallet)
+
+    @app.get("/history/{wallet}")
+    def history(wallet: str):
+        return svc.history(wallet)
 
     return app
 

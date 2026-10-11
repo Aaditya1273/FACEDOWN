@@ -37,10 +37,12 @@ class Attest:
     def __init__(self, db: sqlite3.Connection, missions: dict[str, MissionPolicy],
                  sgt: identity.SgtVerifier, attestor: Attestor, *, domain: str, chain_id: str,
                  dev_mode: bool, network: str, ttl_seconds: int = 300,
-                 clock: Callable[[], float] = time.time):
+                 enforce_physical: bool | None = None, clock: Callable[[], float] = time.time):
         self.db, self.missions, self.sgt, self.attestor = db, missions, sgt, attestor
         self.domain, self.chain_id, self.dev_mode, self.network = domain, chain_id, dev_mode, network
         self.ttl, self.clock = ttl_seconds, clock
+        # Emulators have no real motion, so development only reports physical problems unless told otherwise.
+        self.enforce_physical = (not dev_mode) if enforce_physical is None else enforce_physical
         # ponytail: one lock serializes every state transition; per-session locks if throughput matters.
         self.lock = threading.Lock()
         self.settling: set[str] = set()
@@ -204,9 +206,12 @@ class Attest:
                 self._reject(row, e)
                 raise
             with self.db:
-                self.db.execute("INSERT INTO checkpoints VALUES (?,?,?,?,?,?,?,?,?)",
+                self.db.execute("INSERT INTO checkpoints (session_id, idx, timestamp_ms, elapsed_ms, foreground, "
+                                "interactions, response_ms, still_pct, touch_motion, hash, received_at) "
+                                "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
                                 (session_id, cp.index, cp.timestamp_ms, cp.elapsed_ms, int(cp.foreground),
-                                 cp.interactions, cp.response_ms, expected, self.clock()))
+                                 cp.interactions, cp.response_ms, cp.still_pct, cp.touch_motion, expected,
+                                 self.clock()))
                 self.db.execute("UPDATE sessions SET chain_head=? WHERE id=?", (expected, session_id))
         event("checkpoint", session_id, index=cp.index)
         return {"accepted": True, "index": cp.index}
@@ -236,7 +241,7 @@ class Attest:
             self._expect(row, "SUBMITTED")
             policy = self._mission(row["mission_id"])
             cps = [ObservedCheckpoint(r["idx"], r["received_at"], bool(r["foreground"]), r["interactions"],
-                                      r["response_ms"])
+                                      r["response_ms"], r["still_pct"], r["touch_motion"])
                    for r in self.db.execute("SELECT * FROM checkpoints WHERE session_id=? ORDER BY idx",
                                             (session_id,))]
             # P1 = wallet signature + device eligibility (authorize); P2 = + continuous process evidence
@@ -245,7 +250,8 @@ class Attest:
             day = utc_day(self.clock())
             seq = self._claims_today(self._identity_key(row), policy.mission_id, day)
             try:
-                evaluate(policy, row["started_at"], row["submitted_at"], cps, achieved)
+                physical = evaluate(policy, row["started_at"], row["submitted_at"], cps, achieved,
+                                    enforce_physical=self.enforce_physical)
                 if seq >= policy.max_claims_per_identity_per_day:
                     raise AttestError(Reason.ALREADY_CLAIMED, "daily claim limit reached for this device")
             except AttestError as e:
@@ -281,7 +287,10 @@ class Attest:
                     "evidence_chain": "PASSED",
                     "mission_policy": "PASSED",
                     "replay": "PASSED",
+                    **physical,
                 },
+                "physical": {"still_pct": [cp.still_pct for cp in cps],
+                             "touch_motion": [cp.touch_motion for cp in cps]},
                 "reward": {"xp": policy.reward_xp, "token": reserved / 10 ** self._decimals(),
                            "symbol": self.symbol(policy),
                            "funding": "RESERVED" if funded else "UNFUNDED" if reward_base else "NONE",
@@ -435,6 +444,28 @@ class Attest:
         if row["receipt"] is None:
             raise AttestError(Reason.INVALID_STATE, f"no receipt while session is {row['state']}")
         return {"state": row["state"], **json.loads(row["receipt"])}
+
+    def history(self, wallet: str, limit: int = 30) -> list[dict]:
+        """Finished sessions (verified or rejected), newest first, from the stored receipts only."""
+        identity.decode_wallet(wallet)
+        rows = self.db.execute(
+            "SELECT id, mission_id, state, started_at, receipt FROM sessions WHERE wallet=? AND receipt IS NOT NULL "
+            "ORDER BY started_at DESC LIMIT ?", (wallet, limit)).fetchall()
+        out = []
+        for r in rows:
+            rc = json.loads(r["receipt"])
+            m = self.missions.get(r["mission_id"])
+            settlement = rc.get("settlement") or {}
+            out.append({
+                "session_id": r["id"], "mission_id": r["mission_id"], "mission_name": m.name if m else r["mission_id"],
+                "state": r["state"], "started_at": r["started_at"],
+                "duration_seconds": rc.get("duration_seconds", m.duration_seconds if m else 0),
+                "reason": rc.get("reason"), "stake_forfeited": rc.get("stake_forfeited", 0),
+                "paid": settlement.get("reward_token", 0),
+                "symbol": settlement.get("reward_symbol") or (self.symbol(m) if m else None),
+                "settlement_status": settlement.get("status"), "explorer_url": settlement.get("explorer_url"),
+            })
+        return out
 
     def profile(self, wallet: str) -> dict:
         identity.decode_wallet(wallet)
