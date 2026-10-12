@@ -181,3 +181,31 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
     is ContextWrapper -> baseContext.findActivity()
     else -> null
 }
+
+/** Learn the user's knock on their own phone and table: three knocks, face-down. */
+@Composable
+fun CalibrateScreen(c: Screen.Calibrate, onDone: () -> Unit) = Page {
+    TopBar(onBack = onDone)
+    Spacer(Modifier.weight(1f))
+    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        Pip(if (c.threshold != null) PipMood.Proud else PipMood.Still, 160.dp, live = true)
+        Gap(24)
+        Text(if (c.threshold != null) "Got your knock." else "Teach FACEDOWN your knock",
+            style = MaterialTheme.typography.headlineLarge, color = SemanticColors.PrimaryText, textAlign = TextAlign.Center)
+        Gap(8)
+        Text(
+            when {
+                c.threshold != null -> "Your knocks average about %.1f m/s². Check-ins now count a knock above %.2f m/s² on this phone."
+                    .format(c.jolts.sorted()[c.jolts.size / 2] / 1000f, c.threshold)
+                !c.faceDown -> "Lay the phone face-down where you usually work, then knock on the back 3 times. It buzzes for each knock it feels."
+                else -> "Knock on the back. ${3 - c.jolts.size} to go."
+            },
+            style = MaterialTheme.typography.bodyLarge, color = SemanticColors.SecondaryText, textAlign = TextAlign.Center,
+            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
+        Gap(24)
+        Text("${c.jolts.size} of 3", style = MaterialTheme.typography.labelMedium, color = SemanticColors.TertiaryText)
+    }
+    Spacer(Modifier.weight(1f))
+    if (c.threshold != null) PrimaryButton("Done", onClick = onDone)
+    Gap(16)
+}

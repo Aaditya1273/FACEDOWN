@@ -27,8 +27,11 @@ class MotionProbe(
     private val sensors: SensorManager?,
     private val accel: Sensor? = sensors?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER),
     private val measuring: Boolean = accel != null,
+    /** m/s^2 jolt that counts as a knock: the user's calibrated value, or the default. */
+    private val knock: Float = KNOCK,
 ) : SensorEventListener {
-    constructor(context: Context) : this(context.getSystemService(SensorManager::class.java))
+    constructor(context: Context, knock: Float = KNOCK) :
+        this(context.getSystemService(SensorManager::class.java), knock = knock)
 
     /** Called on the sensor thread (main looper) with the knock's jolt in mm/s^2. */
     var onKnock: ((Int) -> Unit)? = null
@@ -102,7 +105,7 @@ class MotionProbe(
         // Knock: a sharp jolt away from the slow baseline, outside our own vibration, at most every 350 ms.
         val dev = abs(mag - baseline)
         baseline += (mag - baseline) * 0.02f
-        if (measuring && dev > KNOCK && ts > quietUntil && ts - lastKnock > KNOCK_GAP_NS) {
+        if (measuring && dev > knock && ts > quietUntil && ts - lastKnock > KNOCK_GAP_NS) {
             lastKnock = ts
             lastTapNs = ts
             touchMax = maxOf(touchMax, (dev * 1000).toInt())
@@ -145,7 +148,7 @@ class MotionProbe(
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
 
-    private companion object {
+    companion object {
         const val SAMPLE_US = 10_000              // ~100 Hz, below the 200 Hz cap that needs a permission
         const val BUF = 400                       // ~4 s at 100 Hz
         const val GRAVITY = 9.81f
@@ -157,6 +160,15 @@ class MotionProbe(
         const val STILL_SD = 0.08                 // m/s^2; a phone lying on a table is well under this
         const val FACE_DOWN_Z = -7f               // m/s^2 on the z axis: screen facing the table
         const val KNOCK = 0.35f                   // m/s^2 jolt; real-phone noise measured at <= 0.09
+        const val CALIBRATION_KNOCK = 0.15f       // listen low while learning the user's knock
+        const val MIN_KNOCK = 0.2f                // never trust a threshold this close to sensor noise
         const val KNOCK_GAP_NS = 350_000_000L
+
+        /** A user's knock threshold from calibration knocks (mm/s^2): half their median knock, never near noise. */
+        fun personalKnock(jolts: List<Int>): Float {
+            if (jolts.isEmpty()) return KNOCK
+            val median = jolts.sorted()[jolts.size / 2] / 1000f
+            return maxOf(MIN_KNOCK, median * 0.5f)
+        }
     }
 }

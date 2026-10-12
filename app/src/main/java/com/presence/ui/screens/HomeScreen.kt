@@ -85,6 +85,7 @@ fun HomeScreen(
     onDisconnect: () -> Unit,
     onRetry: () -> Unit,
     onBuyFreeze: () -> Unit = {},
+    onCalibrate: () -> Unit = {},
 ) {
     var tab by rememberSaveable { mutableStateOf(Tab.Today) }
     Column(Modifier.fillMaxSize().background(SemanticColors.Canvas)) {
@@ -97,7 +98,7 @@ fun HomeScreen(
                 when (t) {
                     Tab.Today -> Today(s, onConnect, onSelect, onOpen, onRetry)
                     Tab.Progress -> Progress(s, onConnect = { tab = Tab.Profile }, onBuyFreeze = onBuyFreeze)
-                    Tab.Profile -> ProfileTab(s, onConnect, onDisconnect, onRetry)
+                    Tab.Profile -> ProfileTab(s, onConnect, onDisconnect, onRetry, onCalibrate)
                 }
             }
         }
@@ -406,7 +407,7 @@ private fun HistoryRow(h: HistoryItem) {
 
 @Composable
 private fun androidx.compose.foundation.layout.ColumnScope.ProfileTab(
-    s: UiState, onConnect: () -> Unit, onDisconnect: () -> Unit, onRetry: () -> Unit,
+    s: UiState, onConnect: () -> Unit, onDisconnect: () -> Unit, onRetry: () -> Unit, onCalibrate: () -> Unit,
 ) = Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
     Gap(16)
     Text("Profile", style = MaterialTheme.typography.headlineLarge, color = SemanticColors.PrimaryText)
@@ -424,6 +425,15 @@ private fun androidx.compose.foundation.layout.ColumnScope.ProfileTab(
     Gap(12)
     if (s.wallet == null) PrimaryButton("Connect wallet", loading = s.busy, onClick = onConnect)
     else SecondaryButton("Disconnect wallet", onClick = onDisconnect)
+
+    Gap(32)
+    SectionLabel("Your knock")
+    Gap(8)
+    Group {
+        KeyValue("Check-in threshold", s.knockThreshold?.let { "%.2f m/s²".format(it) } ?: "Default (not calibrated)")
+    }
+    Gap(12)
+    SecondaryButton(if (s.knockThreshold == null) "Calibrate my knock" else "Recalibrate", onClick = onCalibrate)
 
     Gap(32)
     SectionLabel("Environment")

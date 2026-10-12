@@ -28,7 +28,8 @@
     "sponsor": "Sponsor pool",
     "why": "Most people won't put money at risk on day one (13.7% accepted deposits vs 90% rewards in Halpern et al., NEJM 2015). Free sessions let anyone start; staking is the upgrade.",
     "min_still_pct": 60,
-    "min_touch_motion": 150
+    "min_touch_motion": 150,
+    "allowed_misses": 1
   },
   {
     "mission_id": "quick-noloss",
@@ -60,7 +61,8 @@
     "sponsor": "Sponsor pool",
     "why": "Nobody loses principal, so it isn't a bet: finishing earns the sponsor reward and keeps the streak. On mainnet the locked stake can earn yield that funds the reward (roadmap).",
     "min_still_pct": 60,
-    "min_touch_motion": 150
+    "min_touch_motion": 150,
+    "allowed_misses": 1
   },
   {
     "mission_id": "quick-clock-in",
@@ -91,7 +93,8 @@
     "sponsor": "",
     "why": "Focus apps run on a local timer, so nobody can put money on them. PRESENCE times the session on the server, ties it to one Seeker, and checks for a human at unpredictable moments, so a stake can ride on it.",
     "min_still_pct": 60,
-    "min_touch_motion": 150
+    "min_touch_motion": 150,
+    "allowed_misses": 1
   },
   {
     "mission_id": "deep-free-25",
@@ -122,7 +125,8 @@
     "sponsor": "Sponsor pool",
     "why": "Most people won't put money at risk on day one (13.7% accepted deposits vs 90% rewards in Halpern et al., NEJM 2015). Free sessions let anyone start; staking is the upgrade.",
     "min_still_pct": 60,
-    "min_touch_motion": 150
+    "min_touch_motion": 150,
+    "allowed_misses": 1
   },
   {
     "mission_id": "deep-focus-25",
@@ -153,7 +157,8 @@
     "sponsor": "",
     "why": "A daily appointment with your own attention, with skin in the game, provable on-chain.",
     "min_still_pct": 60,
-    "min_touch_motion": 150
+    "min_touch_motion": 150,
+    "allowed_misses": 1
   },
   {
     "mission_id": "facedown-hour-free",
@@ -184,7 +189,8 @@
     "sponsor": "Sponsor pool",
     "why": "Most people won't put money at risk on day one (13.7% accepted deposits vs 90% rewards in Halpern et al., NEJM 2015). Free sessions let anyone start; staking is the upgrade.",
     "min_still_pct": 60,
-    "min_touch_motion": 150
+    "min_touch_motion": 150,
+    "allowed_misses": 1
   },
   {
     "mission_id": "facedown-hour-noloss",
@@ -216,7 +222,8 @@
     "sponsor": "Sponsor pool",
     "why": "Nobody loses principal, so it isn't a bet: finishing earns the sponsor reward and keeps the streak. On mainnet the locked stake can earn yield that funds the reward (roadmap).",
     "min_still_pct": 60,
-    "min_touch_motion": 150
+    "min_touch_motion": 150,
+    "allowed_misses": 1
   },
   {
     "mission_id": "facedown-hour",
@@ -247,6 +254,7 @@
     "sponsor": "",
     "why": "The research benefit is long stretches away from the phone (Castelo et al., PNAS Nexus 2025), not two-minute timers.",
     "min_still_pct": 60,
-    "min_touch_motion": 150
+    "min_touch_motion": 150,
+    "allowed_misses": 1
   }
 ]

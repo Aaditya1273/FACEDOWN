@@ -200,3 +200,20 @@ def test_development_reports_physical_problems_without_failing(api, clock, devic
     run_process(api, sess, clock, touch_motion=0)
     body = submit_and_verify(api, sess).json()
     assert body["verified"] is True and body["receipt"]["checks"]["human_touch"] == "FLAGGED"
+
+
+def test_one_missed_check_in_is_forgiven_two_are_not(api, clock, device):
+    """N-1 rule: a soft knock that wasn't felt shouldn't cost a real session."""
+    sess = start(api, device)
+    for i in range(4):
+        clock.advance(30)
+        api.post(f"/session/{sess.session_id}/checkpoint",
+                 json=sess.next_checkpoint(int(clock.t * 1000), interactions=0 if i == 2 else 1))
+    assert submit_and_verify(api, sess).json()["verified"] is True
+    other = start(api, SimDevice())
+    for i in range(4):
+        clock.advance(30)
+        api.post(f"/session/{other.session_id}/checkpoint",
+                 json=other.next_checkpoint(int(clock.t * 1000), interactions=0 if i in (1, 2) else 1))
+    body = submit_and_verify(api, other).json()
+    assert body["verified"] is False and "0 interactions" in body["detail"]

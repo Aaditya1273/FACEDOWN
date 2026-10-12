@@ -1,6 +1,9 @@
 package com.presence.session
 
 import android.content.Context
+import android.content.SharedPreferences
+import android.os.VibrationEffect
+import android.os.Vibrator
 import android.os.SystemClock
 import android.util.Base64
 import com.presence.ui.components.formatToken
@@ -40,9 +43,11 @@ class PresenceViewModel @Inject constructor(
     private val api: AttestApi,
     private val wallet: WalletRepository,
     @ApplicationContext private val context: Context,
+    private val prefs: SharedPreferences,
 ) : ViewModel() {
 
-    private val _state = MutableStateFlow(UiState(wallet = wallet.account))
+    private val _state = MutableStateFlow(UiState(wallet = wallet.account,
+        knockThreshold = prefs.getFloat(KEY_KNOCK, 0f).takeIf { it > 0f }))
     val state: StateFlow<UiState> = _state
 
     private var missionJob: Job? = null
@@ -113,6 +118,46 @@ class PresenceViewModel @Inject constructor(
             _state.update { it.copy(busy = false, message = "Streak freeze added. ${formatToken(paid.burned)} ${order.symbol} burned.") }
             refresh()
         }
+    }
+
+    private var calibration: Job? = null
+
+    /** Learn this user's knock: phone face-down, three knocks; each felt knock gets a short buzz. */
+    fun calibrate() {
+        calibration?.cancel()
+        val vibrator = context.getSystemService(Vibrator::class.java)
+        val probe = MotionProbe(context, knock = MotionProbe.CALIBRATION_KNOCK)
+        _state.update { it.copy(screen = Screen.Calibrate()) }
+        probe.onKnock = { jolt ->
+            val c = _state.value.screen as? Screen.Calibrate
+            if (c != null && c.threshold == null && c.faceDown) {
+                val jolts = c.jolts + jolt
+                probe.quiet(500)
+                vibrator?.vibrate(VibrationEffect.createOneShot(60, VibrationEffect.DEFAULT_AMPLITUDE))
+                if (jolts.size < 3) _state.update { it.copy(screen = c.copy(jolts = jolts)) }
+                else {
+                    val t = MotionProbe.personalKnock(jolts)
+                    prefs.edit().putFloat(KEY_KNOCK, t).apply()
+                    _state.update { it.copy(knockThreshold = t, screen = c.copy(jolts = jolts, threshold = t)) }
+                }
+            }
+        }
+        probe.start()
+        calibration = viewModelScope.launch {
+            try {
+                while (isActive) {
+                    _state.update { s -> (s.screen as? Screen.Calibrate)?.let { s.copy(screen = it.copy(faceDown = probe.faceDown)) } ?: s }
+                    delay(200)
+                }
+            } finally {
+                probe.stop()
+            }
+        }
+    }
+
+    fun endCalibration() {
+        calibration?.cancel()
+        _state.update { it.copy(screen = Screen.Home) }
     }
 
     fun disconnect() {
@@ -260,7 +305,7 @@ class PresenceViewModel @Inject constructor(
         windowTaps = 0
         windowForeground = true
         anyBackground = false
-        val probe = MotionProbe(context).also { it.start(); motion = it }
+        val probe = MotionProbe(context, knock = _state.value.knockThreshold ?: MotionProbe.KNOCK).also { it.start(); motion = it }
         // A knock on the back answers the check-in, so a face-down phone never has to be picked up.
         probe.onKnock = { if ((_state.value.screen as? Screen.Active)?.promptVisible == true) pulse() }
         var done = 0
@@ -341,4 +386,8 @@ class PresenceViewModel @Inject constructor(
     // Never logs keys, signatures, auth tokens or evidence contents.
     private fun log(sessionId: String?, stage: String, result: String) =
         Log.i("PRESENCE", "stage=$stage session=$sessionId result=$result")
+
+    private companion object {
+        const val KEY_KNOCK = "knock_threshold"
+    }
 }

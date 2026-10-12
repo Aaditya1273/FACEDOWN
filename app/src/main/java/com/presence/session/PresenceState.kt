@@ -31,6 +31,8 @@ sealed interface Screen {
         val faceDown: Boolean = false,
     ) : Screen
     data class Verifying(val checks: List<Check>) : Screen
+    /** Knock calibration: [jolts] felt so far (mm/s^2); [threshold] once done. */
+    data class Calibrate(val jolts: List<Int> = emptyList(), val threshold: Float? = null, val faceDown: Boolean = false) : Screen
     data class Result(val receipt: Receipt, val checkpointHashes: List<String>) : Screen
     /** [stakeLost]: forfeited to the pool. [stakeReturned]: a No-Loss stake on its way back. */
     data class Failed(val reason: String, val detail: String, val stakeLost: String? = null,
@@ -48,6 +50,8 @@ data class UiState(
     val mission: MissionPolicy? = null,
     val profile: Profile? = null,
     val history: List<com.presence.attest.HistoryItem> = emptyList(),
+    /** The user's calibrated knock threshold (m/s^2), or null if never calibrated. */
+    val knockThreshold: Float? = null,
     /** Sessions running on the server right now, including yours. */
     val facedownNow: Int = 0,
     val busy: Boolean = false,

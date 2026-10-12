@@ -66,6 +66,21 @@ class MotionProbeTest {
     }
 
     @Test
+    fun calibrationUsesHalfTheMedianKnockButNeverGetsCloseToNoise() {
+        assertEquals(0.9f, MotionProbe.personalKnock(listOf(1600, 1800, 2400)), 0.001f)
+        assertEquals(MotionProbe.MIN_KNOCK, MotionProbe.personalKnock(listOf(150, 200, 250)), 0.001f)
+        assertEquals(MotionProbe.KNOCK, MotionProbe.personalKnock(emptyList()), 0.001f)
+    }
+
+    @Test
+    fun aSoftCalibratedKnockIsDetected() {
+        var knocks = 0
+        val p = MotionProbe(null, null, measuring = true, knock = 0.25f).apply { onKnock = { knocks++ } }
+        p.run(30, joltAt = 12.0, jolt = 0.3f)
+        assertEquals(1, knocks)
+    }
+
+    @Test
     fun noSensorMeansNotMeasured() {
         assertEquals(-1 to -1, MotionProbe(null).takeWindow())
     }

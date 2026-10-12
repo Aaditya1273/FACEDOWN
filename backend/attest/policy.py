@@ -35,6 +35,7 @@ class MissionPolicy:
     # Physical evidence (accelerometer). 0 disables a rule. Thresholds need calibration on real phones.
     min_still_pct: int = 0        # each window, the phone lay still at least this share of the time
     min_touch_motion: int = 0     # each "I'm here" tap jolted the phone at least this much (mm/s^2)
+    allowed_misses: int = 0       # check-ins that may go unanswered (N-1 rule: one soft knock can't kill a session)
     extra: dict = field(default_factory=dict)
 
     @property
@@ -83,6 +84,8 @@ def build_policy(m: dict) -> MissionPolicy:
     if p.witness_required:
         # P3 witness flow is not implemented; refuse to load a policy we cannot enforce.
         raise ValueError(f"{p.mission_id}: witness_required is not supported yet")
+    if not 0 <= p.allowed_misses < p.required_checkpoints:
+        raise ValueError(f"{p.mission_id}: allowed_misses must leave at least one answered check-in")
     if p.required_checkpoints < 1 or p.checkpoint_interval_seconds < 5:
         raise ValueError(f"{p.mission_id}: need >= 1 checkpoint and >= 5 s between checkpoints")
     if p.required_checkpoints * p.checkpoint_interval_seconds != p.duration_seconds:
@@ -144,6 +147,7 @@ def evaluate(policy: MissionPolicy, started_at: float, submitted_at: float,
         problems.append(f"duration {submitted_at - started_at:.1f}s < {policy.duration_seconds}s")
 
     prev = started_at
+    missed = []
     for cp in checkpoints:
         gap = cp.received_at - prev
         if gap < policy.checkpoint_interval_seconds - tol:
@@ -151,8 +155,10 @@ def evaluate(policy: MissionPolicy, started_at: float, submitted_at: float,
         if not cp.foreground:
             problems.append(f"checkpoint {cp.index}: session left foreground")
         if cp.interactions < policy.min_interactions_per_checkpoint:
-            problems.append(f"checkpoint {cp.index}: {cp.interactions} interactions")
+            missed.append(f"checkpoint {cp.index}: {cp.interactions} interactions")
         prev = cp.received_at
+    if len(missed) > policy.allowed_misses:
+        problems.extend(missed)
 
     if problems:
         raise AttestError(Reason.POLICY_NOT_SATISFIED, "; ".join(problems))

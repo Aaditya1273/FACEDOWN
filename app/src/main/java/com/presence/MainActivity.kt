@@ -40,6 +40,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.presence.session.PresenceViewModel
 import com.presence.session.Screen
 import com.presence.ui.screens.ActiveScreen
+import com.presence.ui.screens.CalibrateScreen
 import com.presence.ui.screens.CountdownScreen
 import com.presence.ui.screens.FailedScreen
 import com.presence.ui.screens.HomeScreen
@@ -95,7 +96,7 @@ fun ClockInRoot(sender: ActivityResultSender, vm: PresenceViewModel = hiltViewMo
     LaunchedEffect(s.message) {
         s.message?.let { snackbar.showSnackbar(it); vm.clearMessage() }
     }
-    BackHandler(enabled = s.screen != Screen.Home) { vm.home() }
+    BackHandler(enabled = s.screen != Screen.Home) { if (s.screen is Screen.Calibrate) vm.endCalibration() else vm.home() }
 
     Box(Modifier.fillMaxSize()) {
         // Crossfade between screens; Active/Countdown updates keep the same key so they don't re-animate.
@@ -104,11 +105,12 @@ fun ClockInRoot(sender: ActivityResultSender, vm: PresenceViewModel = hiltViewMo
             when (screen) {
                 Screen.Home -> HomeScreen(s, onConnect = { vm.connect(sender) }, onSelect = vm::select,
                     onOpen = vm::openMission, onDisconnect = vm::disconnect, onRetry = { vm.refresh() },
-                    onBuyFreeze = { vm.buyFreeze(sender) })
+                    onBuyFreeze = { vm.buyFreeze(sender) }, onCalibrate = vm::calibrate)
                 Screen.Mission -> MissionScreen(s, onBack = vm::home, onStart = { vm.startMission(sender) })
                 is Screen.Countdown -> CountdownScreen(screen.seconds)
                 is Screen.Active -> ActiveScreen(screen, s.facedownNow, onPulse = vm::onPulse, onBuzz = vm::onBuzz)
                 is Screen.Verifying -> VerifyingScreen(screen)
+                is Screen.Calibrate -> CalibrateScreen(screen, onDone = vm::endCalibration)
                 is Screen.Result -> ReceiptScreen(screen, onDone = vm::home)
                 is Screen.Failed -> FailedScreen(screen, onRetry = vm::openMission, onHome = vm::home)
             }
