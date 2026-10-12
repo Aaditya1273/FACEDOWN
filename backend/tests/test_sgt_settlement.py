@@ -168,3 +168,20 @@ def test_stake_accepts_wallet_priority_fees_but_nothing_else():
     elsewhere = transfer_checked_ix(pool, mint, thief, user, 1_000_000, 6)
     assert stake_tampering(Message.new_with_blockhash([elsewhere], user, Hash.new_unique()), issued) == "instructions changed"
     assert stake_tampering(Message.new_with_blockhash([stake], thief, Hash.new_unique()), issued) == "fee payer changed"
+
+
+def test_rpc_backs_off_on_429(monkeypatch):
+    import httpx
+    from attest import settlement
+    calls = []
+    def post(url, **kw):
+        calls.append(1)
+        req = httpx.Request("POST", url)
+        if len(calls) < 3:
+            return httpx.Response(429, request=req)
+        return httpx.Response(200, json={"jsonrpc": "2.0", "id": 1, "result": 42}, request=req)
+    monkeypatch.setattr(settlement.httpx, "post", post)
+    monkeypatch.setattr(settlement.time, "sleep", lambda s: None)
+    a = object.__new__(settlement.SolanaAttestor)
+    a.rpc_url, a.timeout = "https://rpc.example", 5
+    assert a._rpc("getSlot", []) == 42 and len(calls) == 3

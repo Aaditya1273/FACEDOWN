@@ -30,13 +30,16 @@ def main() -> None:
         return print("devseed: pools already funded")
     amount = PER_MISSION * 10 ** a.reward_decimals
     for mission_id in svc.missions:
-        sig = a.send(Instruction(TOKEN_PROGRAM, bytes([7]) + struct.pack("<Q", amount), [
-            AccountMeta(a.reward_mint, is_signer=False, is_writable=True),
-            AccountMeta(a.pool, is_signer=False, is_writable=True),
-            AccountMeta(a.keypair.pubkey(), is_signer=True, is_writable=False)]))
-        a.confirm(sig)
-        svc.sponsor_deposit(mission_id, sig)
-        print(f"devseed: {mission_id} +{PER_MISSION} test tokens ({sig})")
+        try:  # best effort: an RPC hiccup must never stop the server from starting
+            sig = a.send(Instruction(TOKEN_PROGRAM, bytes([7]) + struct.pack("<Q", amount), [
+                AccountMeta(a.reward_mint, is_signer=False, is_writable=True),
+                AccountMeta(a.pool, is_signer=False, is_writable=True),
+                AccountMeta(a.keypair.pubkey(), is_signer=True, is_writable=False)]))
+            a.confirm(sig)
+            svc.sponsor_deposit(mission_id, sig)
+            print(f"devseed: {mission_id} +{PER_MISSION} test tokens ({sig})")
+        except Exception as e:
+            print(f"devseed: {mission_id} not funded ({e})")
 
 
 if __name__ == "__main__":

@@ -218,8 +218,12 @@ class SolanaAttestor:
         return associated_token_address(self.keypair.pubkey(), self.reward_mint) if self.reward_mint else None
 
     def _rpc(self, method: str, params: list):
-        r = httpx.post(self.rpc_url, timeout=self.timeout,
-                       json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params})
+        for wait in (0.5, 1, 2, 4, 8, None):  # public RPCs answer 429 under load; back off and retry
+            r = httpx.post(self.rpc_url, timeout=self.timeout,
+                           json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params})
+            if r.status_code != 429 or wait is None:
+                break
+            time.sleep(wait)
         r.raise_for_status()
         body = r.json()
         if "error" in body:
