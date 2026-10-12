@@ -5,6 +5,8 @@ import android.net.Uri
 import com.funkatronics.encoders.Base58
 import com.presence.attest.AttestException
 import com.solana.mobilewalletadapter.clientlib.ActivityResultSender
+import com.solana.mobilewalletadapter.clientlib.AdapterOperations
+import com.solana.mobilewalletadapter.clientlib.protocol.MobileWalletAdapterClient
 import com.solana.mobilewalletadapter.clientlib.MobileWalletAdapter
 import com.solana.mobilewalletadapter.clientlib.TransactionResult
 import com.solana.mobilewalletadapter.clientlib.successPayload
@@ -59,7 +61,7 @@ class WalletRepository @Inject constructor(
     suspend fun signMessage(sender: ActivityResultSender, message: String): ByteArray {
         val current = account ?: throw AttestException("WALLET_NOT_CONNECTED")
         val address = Base58.decode(current.address)
-        val result = adapter.transact(sender) {
+        val result = walletTransact(sender) {
             signMessagesDetached(arrayOf(message.toByteArray()), arrayOf(address))
         }
         return when (result) {
@@ -79,7 +81,7 @@ class WalletRepository @Inject constructor(
     suspend fun signSession(sender: ActivityResultSender, message: String, stakeTx: ByteArray?): Pair<ByteArray, ByteArray?> {
         val current = account ?: throw AttestException("WALLET_NOT_CONNECTED")
         val address = Base58.decode(current.address)
-        val result = adapter.transact(sender) {
+        val result = walletTransact(sender) {
             val signed = signMessagesDetached(arrayOf(message.toByteArray()), arrayOf(address))
             val stake = stakeTx?.let { signTransactions(arrayOf(it)) }
             Pair(signed, stake)
@@ -100,13 +102,33 @@ class WalletRepository @Inject constructor(
 
     /** Sign one transaction ATTEST built (e.g. a streak-freeze payment); ATTEST submits it. */
     suspend fun signTransaction(sender: ActivityResultSender, tx: ByteArray): ByteArray {
-        val result = adapter.transact(sender) { signTransactions(arrayOf(tx)) }
+        val result = walletTransact(sender) { signTransactions(arrayOf(tx)) }
         return when (result) {
             is TransactionResult.Success -> result.payload.signedPayloads.firstOrNull()
                 ?: throw AttestException("WALLET_REJECTED", "wallet returned no transaction")
             is TransactionResult.NoWalletFound -> throw AttestException("WALLET_NOT_FOUND")
             is TransactionResult.Failure -> throw AttestException("WALLET_REJECTED", result.e.message ?: "")
         }
+    }
+
+    /**
+     * Every wallet call goes through here. Wallets rotate the auth token when they approve a request
+     * (Solflare does), so the newest one is saved each time; a saved token the wallet no longer accepts
+     * ("authorization request failed", e.g. after an app restart restored an old one) is dropped and the
+     * call is retried once with a fresh authorization.
+     */
+    private suspend fun <T> walletTransact(
+        sender: ActivityResultSender,
+        block: suspend AdapterOperations.(MobileWalletAdapterClient.AuthorizationResult) -> T,
+    ): TransactionResult<T> {
+        var result = adapter.transact(sender, block = block)
+        if (result is TransactionResult.Failure && adapter.authToken != null &&
+            "authoriz" in (result.e.message ?: "").lowercase()) {
+            adapter.authToken = null
+            result = adapter.transact(sender, block = block)
+        }
+        if (result is TransactionResult.Success) prefs.edit().putString(KEY_TOKEN, result.authResult.authToken).apply()
+        return result
     }
 
     fun disconnect() {
