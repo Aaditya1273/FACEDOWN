@@ -236,6 +236,10 @@ private fun Commitment(m: MissionPolicy, s: UiState) {
             KeyValue("Your stake", "${formatToken(m.stake.token)} $symbol")
             Hairline()
             KeyValue("If you finish", "Stake back + up to ${(m.stake.bonusRate * 100).toInt()}%")
+            if (m.stake.cooldown) {
+                Hairline()
+                KeyValue("If you quit", "Locked 7 days, not lost")
+            }
             s.pools[m.missionId]?.let {
                 Hairline()
                 KeyValue("Bonus pool now", "${formatToken(it.remaining)} $symbol")
@@ -249,7 +253,7 @@ private fun Commitment(m: MissionPolicy, s: UiState) {
         Text("Paid by a sponsor, not by other users. Nothing of yours is at risk.",
             style = MaterialTheme.typography.bodyMedium, color = SemanticColors.TertiaryText)
     } else {
-        Text("The bonus is paid from the pool and capped by what's in it.",
+        Text("The bonus is paid by sponsors and capped by what's in the pool. Nobody wins your stake if you quit.",
             style = MaterialTheme.typography.bodyMedium, color = SemanticColors.TertiaryText)
     }
 }
@@ -375,6 +379,9 @@ private fun HistoryRow(h: HistoryItem) {
         h.state == "VERIFIED" -> "Verified · not recorded on-chain"
         h.stakeForfeited > 0 -> "Interrupted · ${formatToken(h.stakeForfeited)} stake to the pool"
         h.stakeReturned > 0 -> "Interrupted · ${formatToken(h.stakeReturned)} stake returned"
+        h.stakeLocked > 0 -> "Interrupted · ${formatToken(h.stakeLocked)} stake locked" + (h.unlockAt?.let {
+            " until " + DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date((it * 1000).toLong()))
+        } ?: "")
         else -> "Not verified"
     }
     Row(

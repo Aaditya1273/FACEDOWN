@@ -29,6 +29,7 @@ class MissionPolicy:
     stake_token: float = 0.0  # user's own stake (REWARD_MINT UI amount): returned on success, forfeited to the pool otherwise
     bonus_rate: float = 0.0   # finishers earn stake * bonus_rate from the pool (funded by forfeits and sponsors)
     no_loss: bool = False     # the stake is locked for the session and returned either way; only finishers earn
+    cooldown: bool = False    # quitting locks the stake for 7 / 14 / 30 days, then returns it; nobody else wins it
     sponsor: str = ""
     why: str = ""
     timing_tolerance_seconds: int = 3
@@ -56,7 +57,8 @@ class MissionPolicy:
             "witness_required": self.witness_required,
             "max_claims_per_identity_per_day": self.max_claims_per_identity_per_day,
             "reward": {"xp": self.reward_xp, "token": self.reward_token, "symbol": self.reward_symbol},
-            "stake": {"token": self.stake_token, "bonus_rate": self.bonus_rate, "no_loss": self.no_loss},
+            "stake": {"token": self.stake_token, "bonus_rate": self.bonus_rate, "no_loss": self.no_loss,
+                      "cooldown": self.cooldown},
             "sponsor": self.sponsor,
             "why": self.why,
             "physical": {"min_still_pct": self.min_still_pct, "min_touch_motion": self.min_touch_motion},
@@ -78,7 +80,8 @@ def build_policy(m: dict) -> MissionPolicy:
     stake = m.pop("stake", {})
     p = MissionPolicy(reward_xp=int(reward["xp"]), reward_token=float(reward.get("token", 0)),
                       reward_symbol=reward.get("symbol", "SKR"), stake_token=float(stake.get("token", 0)),
-                      bonus_rate=float(stake.get("bonus_rate", 0)), no_loss=bool(stake.get("no_loss", False)), **m)
+                      bonus_rate=float(stake.get("bonus_rate", 0)), no_loss=bool(stake.get("no_loss", False)),
+                      cooldown=bool(stake.get("cooldown", False)), **m)
     if p.required_assurance not in ASSURANCE_LEVELS:
         raise ValueError(f"{p.mission_id}: unknown assurance {p.required_assurance}")
     if p.witness_required:
@@ -92,6 +95,8 @@ def build_policy(m: dict) -> MissionPolicy:
         raise ValueError(f"{p.mission_id}: duration must equal checkpoints x interval")
     if not 1 <= p.max_claims_per_identity_per_day <= 255:
         raise ValueError(f"{p.mission_id}: max claims per day must be 1..255 (on-chain claim index is a u8)")
+    if p.cooldown and (p.stake_token <= 0 or p.no_loss):
+        raise ValueError(f"{p.mission_id}: cooldown needs a stake and excludes no_loss")
     if p.no_loss and (p.stake_token <= 0 or p.bonus_rate):
         raise ValueError(f"{p.mission_id}: no_loss needs a stake and no bonus (nobody forfeits to fund one)")
     if not 0 <= p.bonus_rate <= 1:

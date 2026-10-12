@@ -39,7 +39,9 @@ data class Reward(
 
 @Serializable data class StakeTerms(val token: Double = 0.0, @SerialName("bonus_rate") val bonusRate: Double = 0.0,
                                    /** Returned whether you finish or not; only finishers earn. */
-                                   @SerialName("no_loss") val noLoss: Boolean = false)
+                                   @SerialName("no_loss") val noLoss: Boolean = false,
+                                   /** Quitting locks the stake for 7 / 14 / 30 days instead of losing it. */
+                                   val cooldown: Boolean = false)
 
 @Serializable data class StakeOffer(val amount: Double, val symbol: String, val transaction: String)
 
@@ -110,6 +112,8 @@ data class HistoryItem(
     val reason: String? = null,
     @SerialName("stake_forfeited") val stakeForfeited: Double = 0.0,
     @SerialName("stake_returned") val stakeReturned: Double = 0.0,
+    @SerialName("stake_locked") val stakeLocked: Double = 0.0,
+    @SerialName("unlock_at") val unlockAt: Double? = null,
     val paid: Double = 0.0,
     val symbol: String? = null,
     @SerialName("settlement_status") val settlementStatus: String? = null,

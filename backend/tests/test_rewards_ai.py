@@ -40,26 +40,43 @@ def test_bonus_is_capped_by_the_pool_but_stake_always_returns(api, clock, device
     assert attestor.records[-1].reward_base == 1_000_000
 
 
-def test_quitter_forfeits_stake_which_funds_the_next_finisher(api, clock, attestor):
-    quitter, finisher = SimDevice(), SimDevice()
+def test_quitter_stake_is_locked_not_lost_and_the_lock_escalates(api, clock, attestor):
+    """Cool-down Lock: quitting keeps the loss (no access for 7 / 14 / 30 days) without anyone winning it."""
+    quitter = SimDevice()
     q = start(api, quitter)
     run_process(api, q, clock, foreground=False)  # switched apps during the session
-    body = submit_and_verify(api, q).json()
-    assert body["verified"] is False
-    assert api.get(f"/session/{q.session_id}/receipt").json()["stake_forfeited"] == 1.0
-    assert pool(api)["forfeited"] == 1.0
-    f = start(api, finisher)
+    assert submit_and_verify(api, q).json()["verified"] is False
+    rc = api.get(f"/session/{q.session_id}/receipt").json()
+    assert rc["stake_locked"] == 1.0 and rc["stake_forfeited"] == 0
+    assert rc["unlock_at"] == clock.t + 7 * 86_400
+    assert pool(api)["forfeited"] == 0.0  # nobody else wins it
+    q2 = start(api, quitter)
+    run_process(api, q2, clock, foreground=False)
+    submit_and_verify(api, q2)
+    assert api.get(f"/session/{q2.session_id}/receipt").json()["unlock_at"] == clock.t + 14 * 86_400
+    clock.advance(7 * 86_400 + 1)
+    start(api, SimDevice())  # any later session releases stakes that are due
+    assert attestor.refunds == [(quitter.wallet, 1_000_000)]  # the first lock ran out; the second still holds
+
+
+def test_finishers_bonus_comes_from_sponsors_only(api, clock, attestor):
+    f = start(api, SimDevice())
     run_process(api, f, clock)
-    rc = submit_and_verify(api, f).json()["receipt"]
-    assert rc["reward"]["bonus"] == 0.2  # paid out of the quitter's stake
-    assert attestor.records[-1].wallet == finisher.wallet
+    assert submit_and_verify(api, f).json()["receipt"]["reward"]["bonus"] == 0.0  # unfunded pool: no bonus
+    deposit(api, attestor, "dep-bonus", 5_000_000)
+    g = start(api, SimDevice())
+    run_process(api, g, clock)
+    assert submit_and_verify(api, g).json()["receipt"]["reward"]["bonus"] == 0.2
 
 
-def test_unfinished_session_forfeits_on_expiry(api, clock, device):
+def test_unfinished_session_is_locked_on_expiry(api, clock, device, attestor):
     start(api, device)  # stake held, then the user walks away
-    assert pool(api)["forfeited"] == 0.0
     clock.advance(120 + 301)
-    assert pool(api)["forfeited"] == 1.0
+    start(api, SimDevice())
+    assert pool(api)["forfeited"] == 0.0
+    clock.advance(7 * 86_400 + 1)
+    start(api, SimDevice())
+    assert attestor.refunds == [(device.wallet, 1_000_000)]
 
 
 def test_stake_is_required_and_must_be_the_issued_transaction(api, device):
@@ -147,7 +164,7 @@ def test_history_lists_finished_sessions_newest_first(api, clock, attestor):
     submit_and_verify(api, f)
     h = api.get(f"/history/{quitter.wallet}").json()
     assert [x["state"] for x in h] == ["SETTLED", "REJECTED"]
-    assert h[0]["paid"] == 1.2 and h[1]["stake_forfeited"] == 1.0
+    assert h[0]["paid"] == 1.0 and h[1]["stake_locked"] == 1.0 and h[1]["unlock_at"] is not None
     assert h[1]["symbol"] == "SKR-TEST"  # rejected receipts carry no settlement, so it comes from the mission
     assert api.get(f"/history/{SimDevice().wallet}").json() == []
 

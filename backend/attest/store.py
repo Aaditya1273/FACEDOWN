@@ -64,7 +64,9 @@ CREATE TABLE IF NOT EXISTS stakes (
   amount_base INTEGER NOT NULL,
   unsigned_tx BLOB NOT NULL,
   signature TEXT,
-  status TEXT NOT NULL            -- ISSUED | HELD | RETURNED | FORFEITED
+  status TEXT NOT NULL,           -- ISSUED | HELD | RETURNED | FORFEITED | LOCKED (cool-down)
+  locked_at REAL,
+  unlock_at REAL
 );
 -- DEVELOPMENT faucet: one grant per wallet.
 CREATE TABLE IF NOT EXISTS faucet_grants (
@@ -107,6 +109,11 @@ def connect(path: str | Path) -> sqlite3.Connection:
                                 ("profiles", "freezes", 0)):  # databases created before these columns existed
         try:
             db.execute(f"ALTER TABLE {table} ADD COLUMN {col} INTEGER NOT NULL DEFAULT {default}")
+        except sqlite3.OperationalError:
+            pass
+    for col in ("locked_at", "unlock_at"):
+        try:
+            db.execute(f"ALTER TABLE stakes ADD COLUMN {col} REAL")
         except sqlite3.OperationalError:
             pass
     return db

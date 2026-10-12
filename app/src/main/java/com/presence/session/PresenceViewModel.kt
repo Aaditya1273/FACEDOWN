@@ -290,8 +290,16 @@ class PresenceViewModel @Inject constructor(
                 // A stake is only lost if the session got past authorize (the server forfeits it).
                 val atStake = staked.takeIf { err.reason !in setOf("STAKE_REQUIRED", "STAKE_FAILED", "NETWORK_ERROR", "WALLET_REJECTED") }
                 val noLoss = mission.stake.noLoss
+                // Cool-down: the server decides how long (7 / 14 / 30 days); read it back from the receipt.
+                val lockedUntil = if (atStake != null && mission.stake.cooldown) runCatching {
+                    api.history(account.address).firstOrNull()?.unlockAt?.let { ts ->
+                        "$atStake, until " + java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM)
+                            .format(java.util.Date((ts * 1000).toLong()))
+                    }
+                }.getOrNull() else null
                 _state.update { it.copy(busy = false, screen = Screen.Failed(err.reason, err.detail,
-                    stakeLost = atStake.takeUnless { noLoss }, stakeReturned = atStake.takeIf { noLoss })) }
+                    stakeLost = atStake.takeUnless { noLoss || mission.stake.cooldown },
+                    stakeReturned = atStake.takeIf { noLoss }, stakeLockedUntil = lockedUntil)) }
             } finally {
                 key.destroy()
             }

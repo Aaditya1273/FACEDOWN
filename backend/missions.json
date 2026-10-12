@@ -67,12 +67,12 @@
   {
     "mission_id": "quick-clock-in",
     "name": "Quick Facedown",
-    "description": "Two minutes, phone down, one thing in mind. Stake 1 SKR: finish and get it back plus a bonus from the pool. Quit and it feeds the pool for everyone who finished.",
+    "description": "Two minutes, phone down, one thing in mind. Stake 1 SKR: finish and get it back plus a bonus from the pool. Quit and your stake is locked for a week, not lost.",
     "steps": [
       "Stake and start; your wallet signs once",
       "Lay the phone face-down with FACEDOWN open (the screen goes dark)",
       "When it buzzes, knock on the back (4 checks, one in every 30 s)",
-      "Switching apps or missing a check forfeits the stake"
+      "Switching apps or missing two checks locks the stake for 7 days (14, then 30 if you quit again within a month), then it comes back"
     ],
     "required_assurance": "P2",
     "duration_seconds": 120,
@@ -88,7 +88,8 @@
     },
     "stake": {
       "token": 1.0,
-      "bonus_rate": 0.2
+      "bonus_rate": 0.2,
+      "cooldown": true
     },
     "sponsor": "",
     "why": "Focus apps run on a local timer, so nobody can put money on them. PRESENCE times the session on the server, ties it to one Seeker, and checks for a human at unpredictable moments, so a stake can ride on it.",
@@ -136,7 +137,7 @@
       "Stake and start; your wallet signs once",
       "Lay the phone face-down with FACEDOWN open (the screen goes dark)",
       "When it buzzes, knock on the back (5 checks, one in every 5 minutes)",
-      "Switching apps or missing a check forfeits the stake"
+      "Switching apps or missing two checks locks the stake for 7 days (14, then 30 if you quit again within a month), then it comes back"
     ],
     "required_assurance": "P2",
     "duration_seconds": 1500,
@@ -152,7 +153,8 @@
     },
     "stake": {
       "token": 5.0,
-      "bonus_rate": 0.2
+      "bonus_rate": 0.2,
+      "cooldown": true
     },
     "sponsor": "",
     "why": "A daily appointment with your own attention, with skin in the game, provable on-chain.",
@@ -233,7 +235,7 @@
       "Stake and start; your wallet signs once",
       "Lay the phone face-down with FACEDOWN open (the screen goes dark)",
       "When it buzzes, knock on the back (4 checks, one in every 15 minutes)",
-      "Switching apps or missing a check forfeits the stake"
+      "Switching apps or missing two checks locks the stake for 7 days (14, then 30 if you quit again within a month), then it comes back"
     ],
     "required_assurance": "P2",
     "duration_seconds": 3600,
@@ -249,7 +251,8 @@
     },
     "stake": {
       "token": 5.0,
-      "bonus_rate": 0.2
+      "bonus_rate": 0.2,
+      "cooldown": true
     },
     "sponsor": "",
     "why": "The research benefit is long stretches away from the phone (Castelo et al., PNAS Nexus 2025), not two-minute timers.",

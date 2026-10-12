@@ -36,7 +36,7 @@ sealed interface Screen {
     data class Result(val receipt: Receipt, val checkpointHashes: List<String>) : Screen
     /** [stakeLost]: forfeited to the pool. [stakeReturned]: a No-Loss stake on its way back. */
     data class Failed(val reason: String, val detail: String, val stakeLost: String? = null,
-                      val stakeReturned: String? = null) : Screen
+                      val stakeReturned: String? = null, val stakeLockedUntil: String? = null) : Screen
 }
 
 data class UiState(

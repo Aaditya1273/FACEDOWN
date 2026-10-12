@@ -98,49 +98,74 @@ class Attest:
             "SELECT COUNT(*) FROM claims WHERE identity_key=? AND mission_id=? AND day=?",
             (identity_key, mission_id, day)).fetchone()[0]
 
+    COOLDOWN_DAYS = (7, 14, 30)  # first quit, second within 30 days, third and later
+
+    def _lock_days(self, wallet: str) -> int:
+        recent = self.db.execute("SELECT COUNT(*) FROM stakes WHERE wallet=? AND locked_at > ?",
+                                 (wallet, self.clock() - 30 * 86_400)).fetchone()[0]
+        return self.COOLDOWN_DAYS[min(recent, len(self.COOLDOWN_DAYS) - 1)]
+
+    def _lock(self, session_id: str, wallet: str) -> float:
+        """Cool-down: the stake stays in the pool, owned by nobody else, until unlock_at; then it's returned."""
+        unlock_at = self.clock() + self._lock_days(wallet) * 86_400
+        self.db.execute("UPDATE stakes SET status='LOCKED', locked_at=?, unlock_at=? WHERE session_id=? AND status='HELD'",
+                        (self.clock(), unlock_at, session_id))
+        return unlock_at
+
     def _reject(self, row: sqlite3.Row, err: AttestError) -> None:
         p = self._profile(row["wallet"])
         p.rejected_count += 1
         held = self._held_stake(row["id"]) / 10 ** self._decimals()
-        no_loss = self._mission(row["mission_id"]).no_loss
+        m = self._mission(row["mission_id"])
         with self.db:
             self._save_profile(p)
+            unlock_at = self._lock(row["id"], row["wallet"]) if m.cooldown and held else None
+            if not (m.no_loss or m.cooldown):
+                self.db.execute("UPDATE stakes SET status='FORFEITED' WHERE session_id=? AND status='HELD'", (row["id"],))
             self.db.execute("UPDATE sessions SET state='REJECTED', receipt=? WHERE id=?",
                             (json.dumps({"status": "REJECTED", "reason": err.reason, "detail": err.detail,
-                                         "stake_forfeited": 0 if no_loss else held,
-                                         "stake_returned": held if no_loss else 0}),
+                                         "stake_forfeited": 0 if (m.no_loss or m.cooldown) else held,
+                                         "stake_returned": held if m.no_loss else 0,
+                                         "stake_locked": held if unlock_at else 0, "unlock_at": unlock_at}),
                              row["id"]))
-            if not no_loss:
-                self.db.execute("UPDATE stakes SET status='FORFEITED' WHERE session_id=? AND status='HELD'", (row["id"],))
         event("rejected", row["id"], mission_id=row["mission_id"], reason=err.reason)
-        if no_loss:
-            self._refund_no_loss()
+        if m.no_loss:
+            self._release_stakes()
 
-    def _refund_no_loss(self) -> None:
-        """No-Loss stakes go back to their owner when a session fails or is abandoned until it expires.
-        A refund that fails on the network stays HELD and is retried on the next call."""
+    def _release_stakes(self) -> None:
+        """Return stakes that are due: No-Loss stakes of failed or abandoned sessions, and cool-down stakes
+        whose lock has run out. Abandoned cool-down sessions are locked first. A refund that fails on the
+        network is retried on the next call."""
+        now = self.clock()
+        abandoned = "s.expires_at < ? AND s.state IN ('CREATED','ACTIVE','SUBMITTED')"
+        for r in self.db.execute(f"SELECT k.session_id, k.wallet, k.mission_id FROM stakes k JOIN sessions s ON s.id=k.session_id "
+                                 f"WHERE k.status='HELD' AND {abandoned}", (now,)).fetchall():
+            m = self.missions.get(r["mission_id"])
+            if m and m.cooldown:
+                with self.db:
+                    self._lock(r["session_id"], r["wallet"])
         rows = self.db.execute(
-            "SELECT k.session_id, k.wallet, k.amount_base, k.mission_id FROM stakes k JOIN sessions s ON s.id=k.session_id "
-            "WHERE k.status='HELD' AND (s.state='REJECTED' OR (s.expires_at < ? AND s.state IN ('CREATED','ACTIVE','SUBMITTED')))",
-            (self.clock(),)).fetchall()
+            "SELECT k.session_id, k.wallet, k.amount_base, k.mission_id, k.status FROM stakes k JOIN sessions s ON s.id=k.session_id "
+            f"WHERE (k.status='HELD' AND (s.state='REJECTED' OR ({abandoned}))) OR (k.status='LOCKED' AND k.unlock_at <= ?)",
+            (now, now)).fetchall()
         for r in rows:
             m = self.missions.get(r["mission_id"])
-            if not (m and m.no_loss):
+            if r["status"] == "HELD" and not (m and m.no_loss):
                 continue
             try:
                 sig = self.attestor.refund(r["wallet"], r["amount_base"])
             except Exception as e:  # network / RPC: retried next time
-                log.warning("no-loss refund for %s failed: %s", r["session_id"], e)
+                log.warning("stake refund for %s failed: %s", r["session_id"], e)
                 continue
             with self.db:
                 self.db.execute("UPDATE stakes SET status='RETURNED', signature=COALESCE(signature, ?) "
-                                "WHERE session_id=? AND status='HELD'", (sig, r["session_id"]))
+                                "WHERE session_id=? AND status=?", (sig, r["session_id"], r["status"]))
             event("refunded", r["session_id"], mission_id=r["mission_id"], signature=sig)
 
     # ---------- protocol steps ----------
 
     def create_session(self, wallet: str, mission_id: str, ephemeral_pubkey: str) -> dict:
-        self._refund_no_loss()  # abandoned No-Loss sessions that have since expired
+        self._release_stakes()  # abandoned No-Loss sessions, cool-downs that have run out
         policy = self._mission(mission_id)
         identity.decode_wallet(wallet)
         identity.load_ephemeral_key(ephemeral_pubkey)
@@ -164,7 +189,8 @@ class Attest:
                 (session_id, nonce, mission_id, wallet, ephemeral_pubkey, message, now, now + ttl,
                  evidence.genesis(session_id, nonce)))
             if stake_tx:
-                self.db.execute("INSERT INTO stakes VALUES (?,?,?,?,?,NULL,'ISSUED')",
+                self.db.execute("INSERT INTO stakes (session_id, wallet, mission_id, amount_base, unsigned_tx, signature, status) "
+                                "VALUES (?,?,?,?,?,NULL,'ISSUED')",
                                 (session_id, wallet, mission_id, stake_base, stake_tx))
         event("session_created", session_id, mission_id=mission_id, staked=bool(stake_tx))
         stake = ({"amount": stake_base / 10 ** self._decimals(), "symbol": self.symbol(policy),
@@ -406,7 +432,8 @@ class Attest:
 
     def _forfeited(self, mission_id: str) -> int:
         """Stakes lost to the pool: rejected sessions, plus held stakes whose session expired unfinished."""
-        if self.missions[mission_id].no_loss:
+        m = self.missions[mission_id]
+        if m.no_loss or m.cooldown:
             return 0
         return self.db.execute(
             "SELECT COALESCE(SUM(k.amount_base),0) FROM stakes k JOIN sessions s ON s.id = k.session_id "
@@ -545,6 +572,7 @@ class Attest:
                 "duration_seconds": rc.get("duration_seconds", m.duration_seconds if m else 0),
                 "reason": rc.get("reason"), "stake_forfeited": rc.get("stake_forfeited", 0),
                 "stake_returned": rc.get("stake_returned", 0),
+                "stake_locked": rc.get("stake_locked", 0), "unlock_at": rc.get("unlock_at"),
                 "paid": settlement.get("reward_token", 0),
                 "symbol": settlement.get("reward_symbol") or (self.symbol(m) if m else None),
                 "settlement_status": settlement.get("status"), "explorer_url": settlement.get("explorer_url"),

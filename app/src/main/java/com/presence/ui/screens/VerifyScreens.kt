@@ -289,6 +289,14 @@ fun FailedScreen(f: Screen.Failed, onRetry: () -> Unit, onHome: () -> Unit) = Pa
             Text(reasonMessage(f.reason), style = MaterialTheme.typography.bodyLarge,
                 color = SemanticColors.SecondaryText, textAlign = TextAlign.Center)
         }
+        f.stakeLockedUntil?.let {
+            Gap(32)
+            SectionLabel("Your stake")
+            Gap(8)
+            Text("Cool-down: your stake is locked, not lost: $it. Then it comes back to your wallet. " +
+                "Quit again within a month and the next lock is longer.",
+                style = MaterialTheme.typography.bodyLarge, color = SemanticColors.PrimaryText)
+        }
         f.stakeReturned?.let {
             Gap(32)
             SectionLabel("Your stake")

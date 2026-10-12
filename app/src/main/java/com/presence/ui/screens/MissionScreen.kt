@@ -85,6 +85,10 @@ fun MissionScreen(s: UiState, onBack: () -> Unit, onStart: () -> Unit) = Page {
                 KeyValue("Stake", stake)
                 Hairline()
                 KeyValue("If you finish", "Stake back + up to ${(m.stake.bonusRate * 100).toInt()}%")
+                if (m.stake.cooldown) {
+                    Hairline()
+                    KeyValue("If you quit", "Locked 7 days (14, then 30)")
+                }
             }
         }
 
@@ -96,7 +100,11 @@ fun MissionScreen(s: UiState, onBack: () -> Unit, onStart: () -> Unit) = Page {
         Rule("Stay online until the result appears.")
 
         Gap(24)
-        SectionLabel(if (staked) "You lose the stake if" else "The session fails if")
+        SectionLabel(when {
+            staked && m.stake.cooldown -> "Your stake is locked if"
+            staked -> "You lose the stake if"
+            else -> "The session fails if"
+        })
         Gap(4)
         Rule("You switch apps, go home, or lock the phone")
         Rule("You miss a check-in, or pick the phone up and keep it face-up")
@@ -131,7 +139,8 @@ fun MissionScreen(s: UiState, onBack: () -> Unit, onStart: () -> Unit) = Page {
                 uncheckedColor = SemanticColors.SecondaryText))
         Spacer(Modifier.width(Spacing.related))
         Text(
-            (if (staked) "I understand I lose $stake if I leave or miss a check-in. " else "") +
+            (if (staked && m.stake.cooldown) "I understand $stake is locked for 7 days or more if I quit. "
+             else if (staked) "I understand I lose $stake if I leave or miss a check-in. " else "") +
                 "During the session FACEDOWN records only whether it stays on screen, when I answer, and two " +
                 "motion numbers (how still and face-down the phone lay, how much my knocks moved it).",
             style = MaterialTheme.typography.bodyMedium, color = SemanticColors.PrimaryText,
