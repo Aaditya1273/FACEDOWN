@@ -42,8 +42,8 @@ object AppModule {
     @Singleton
     fun httpClient(): HttpClient = HttpClient(Android) {
         engine {
-            connectTimeout = 10_000
-            socketTimeout = 45_000 // /verify waits for on-chain confirmation
+            connectTimeout = 30_000
+            socketTimeout = 90_000 // /verify waits for on-chain confirmation; a free host may also be waking from sleep
         }
     }
 }
