@@ -104,10 +104,26 @@ flowchart LR
 | **Face-down session** (emulator): 4/4 knocks, human touch + phone-down verified, attestation + sponsor reward | [2R1V…xiit](https://explorer.solana.com/tx/2R1VrBwdbkXkpfZ1eQLRAkM6BNMXryes7u3KAQs689QRw6PBNw1PUxzTRz5PfhatMRPSHy5JRxnHwFvEgNiWxiit?cluster=devnet) |
 | **No-Loss**: quit mid-session, stake refunded | [a6Em…iE1](https://explorer.solana.com/tx/a6Em7BAUah1osjjuJUWzi9JHAqsycLuAtyhthDXUVZwG1jJ5q5gTr4ZzsJioWiA1pAA4eXRRXVA2kiF1cjpiiE1?cluster=devnet) |
 | **Streak freeze**: 2 SKR-TEST paid | [7qc5…R9r](https://explorer.solana.com/tx/7qc5aKgJ76qzy8idtPqSxtrfDbtcjqbPcpJ5rLLbzn1pHbB4pJGBsPS5QQkNMscSee4wBpkJCZvkK2ED25KeR9r?cluster=devnet), 1 SKR-TEST **burned** [2FDV…aMf](https://explorer.solana.com/tx/2FDVJdb2azN4pAD3cPEjn3bdzXCDrvXvaV586kMoDzYBkkxt1xTZngBqvBxwdumNYdTMDKTifTvWPMDrwAXESaMf?cluster=devnet) |
-| Real phone + Solflare (pre-face-down build): stake of 1 SKR-TEST | [yKF8…qnt](https://explorer.solana.com/tx/yKF8g4evQLErYHiELKfR5sHHPyyFq1nkGPZSG4bLV6vZ4tfsgf4o3TX2f3Jz7pfzQkhMjwzn6Ce16WWLBZn8qnt?cluster=devnet) |
-| Real phone + Solflare: finished, attestation + stake back + 0.2 bonus | [5vbS…i6Nd](https://explorer.solana.com/tx/5vbSaLXNDUZ1Q2zMqKBrV1n4a5wEqiPRSficKMqeckktqczxPraxxrPtcLgVfx2rgm45YNAcsaMzLADK9KmHi6Nd?cluster=devnet) |
-| Real phone + Solflare: free session, attestation + 0.1 sponsor reward | [2gtc…obNu](https://explorer.solana.com/tx/2gtcaWDPiB3uanDdia8iP6n96G6oTDnb4VjMJjWT2JAzRytcQh8cKB3wbSj16Rvi6yepuVWqCiZnKKEERPrZobNu?cluster=devnet) |
-| Real phone + Solflare: left the app, stake forfeited to the pool | [3RAz…3aPk](https://explorer.solana.com/tx/3RAz2dQsauyHM2eDqNvRk2utexRqNRYBkEhw7pR1Zdxi7DMWy9PCo3DAqLer56CP3cvNnJmaLEpxirAo4azi3aPk?cluster=devnet) |
+
+**Real phone (realme, Android 13) + Solflare on devnet, current build, app restarted between runs:**
+
+| | |
+|---|---|
+| Free session: attestation + 0.1 sponsor reward | [65dm…sVCe](https://explorer.solana.com/tx/65dmpG1SiBEnUh9YJk358JnkDSrThrqsZBJdteKqdfLq5Gw9NmRGyypCrJn8zMjtkdMhUFmpqnDHc3t6bC9XsVCe?cluster=devnet) |
+| No-Loss: 1 SKR-TEST locked [htM3…jrBd](https://explorer.solana.com/tx/htM37NsU3bZD1pASmiWQZnU72uZZi5HbuwUQ43xSYReU5TgsES8RCjjwSsa5ARxf3fzt6mCRvvNobGYMUBtjrBd?cluster=devnet), finished: stake back + reward | [3tLy…SLMo](https://explorer.solana.com/tx/3tLytYKxxyQpTkWh8sb2nJhYie29yhcHKJ4ZTXuAATjAucSCmHZkF43g5TehjiTH7GTqQAq6bC5oz5kisH1DSLMo?cluster=devnet) |
+| Stake: 1 SKR-TEST staked [3CwX…fNB5](https://explorer.solana.com/tx/3CwXnpdqZ4HQScAPvYg9LBrssLBm9baTzBdSc4yhvYc59QQqN27AzvRamXBGW3rFe1o4oqYx8d84Rpkm2dRPfNB5?cluster=devnet), finished: attestation + stake back | [RGkd…guRZ](https://explorer.solana.com/tx/RGkdQhLmhLcnrQetyQvRB5SFVvZt9qfMAvZikSnEo5tWBms93ZhnMpxcSnQ89TumMWyFmxNWdYi5ccL6jsWguRZ?cluster=devnet) |
+| Stake, then left the app: **Cool-down Lock**, stake locked until Oct 19 (not lost) | stake [3XhH…3G5b](https://explorer.solana.com/tx/3XhHZQcfWt3qN7zZGo6UN7T73TEd2v9PLhiF8zEfgZu5sbmXutCKb3P6wBhxFr6cvCkARkYRnQw8VskKcxoS3G5b?cluster=devnet) |
+| Streak freeze signed in Solflare (shown as −2 SKR-TEST) | paid [4Csv…GXxp](https://explorer.solana.com/tx/4CsvYY3pBxRgzhieUFj4wCDuNNtHjHtp4GPt8NuSdTSxD8vYr8einDYz3TQJ3Rw6f8ejC8VgdMreq3U8L8iYGXxp?cluster=devnet), burned [pcoH…Cz7n](https://explorer.solana.com/tx/pcoHdAfvkr3srTj5RnMnUyY9A7ojNogQigTtacHUpNBUzZ66aQDZrxDffyF2kaEDpZkjiUNfHPhDLLpGE1HCz7n?cluster=devnet) |
+
+Earlier face-up build on the same phone (Oct 11): stake [yKF8…8qnt](https://explorer.solana.com/tx/yKF8g4evQLErYHiELKfR5sHHPyyFq1nkGPZSG4bLV6vZ4tfsgf4o3TX2f3Jz7pfzQkhMjwzn6Ce16WWLBZn8qnt?cluster=devnet) → stake back + bonus [5vbS…i6Nd](https://explorer.solana.com/tx/5vbSaLXNDUZ1Q2zMqKBrV1n4a5wEqiPRSficKMqeckktqczxPraxxrPtcLgVfx2rgm45YNAcsaMzLADK9KmHi6Nd?cluster=devnet); free [2gtc…obNu](https://explorer.solana.com/tx/2gtcaWDPiB3uanDdia8iP6n96G6oTDnb4VjMJjWT2JAzRytcQh8cKB3wbSj16Rvi6yepuVWqCiZnKKEERPrZobNu?cluster=devnet).
+
+**What a real wallet taught us** (all fixed):
+- Solflare rotates the Mobile Wallet Adapter auth token on every approval; reusing the first one after an app
+  restart fails with "authorization request failed". Every wallet call now saves the newest token and retries once.
+- Solflare adds priority-fee instructions before signing; ATTEST accepts those and refuses any other change
+  (unit-tested: a changed amount, recipient or payer is still refused).
+- Solflare sometimes called a devnet stake "for mainnet". Building stakes on a finalized blockhash made it go away;
+  our reading is that its RPC hadn't seen a just-confirmed hash yet, but that's not confirmed.
 
 ## The business: FACEDOWN is the first app, PRESENCE is the company
 
@@ -154,9 +170,10 @@ Docs: [architecture](docs/architecture.md) · [trust model](docs/trust-model.md)
 
 ## Honest limitations
 
-- **Face-down was verified on the emulator, not yet on a real phone.** Knocks and face-down came from the
-  emulator's virtual accelerometer. The earlier face-up build ran end to end on a real realme phone with Solflare on
-  devnet (table above). Seeker Genesis Token verification is implemented and unit-tested but not run on a Seeker.
+- **Real phone: yes. Real knocks: not yet.** Free, No-Loss, Stake, Cool-down, freezes and squads ran on a real
+  realme phone with Solflare on devnet (table above), with check-ins answered by on-screen taps. Face-down and knock
+  detection were verified on the emulator's virtual accelerometer; a calibrated real-knock session is still to do.
+  Seeker Genesis Token verification is implemented and unit-tested but not run on a Seeker.
 - **Knock thresholds need real data.** Each user calibrates their own knock (half their median, never below
   0.2 m/s²); the server's human-touch floor is 150 mm/s². On a real phone, injected taps still read 20–90 mm/s² of noise
   (one 734 outlier). A measured table across surfaces and phones is still to do.
@@ -168,7 +185,8 @@ Docs: [architecture](docs/architecture.md) · [trust model](docs/trust-model.md)
   law. That's our reading, not legal advice; it needs review before a public launch.
 - **Presence Minutes and Urge Catcher were verified on the emulator only.** The emulator stops sensor delivery
   with its screen off, so screen-off sampling on real phones still needs checking. Urge Catcher is an accessibility
-  service: allowed on the Solana dApp Store, restricted on Google Play.
+  service the user switches on in Android settings (some phones, like realme, don't let adb do it): allowed on the
+  Solana dApp Store, restricted on Google Play.
 - **Single operator.** One attestor key and one ATTEST server.
 - **Test tokens only.** Devnet and localnet use SKR-TEST and a dev-only faucet, which the server refuses on mainnet.
 
