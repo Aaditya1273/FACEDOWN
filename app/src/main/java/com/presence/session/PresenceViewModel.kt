@@ -67,7 +67,7 @@ class PresenceViewModel @Inject constructor(
         refresh()
     }
 
-    fun refresh() = viewModelScope.launch {
+    fun refresh(attempt: Int = 0): Job = viewModelScope.launch {
         try {
             val health = api.health()
             val missions = api.missions()
@@ -85,6 +85,11 @@ class PresenceViewModel @Inject constructor(
             throw e
         } catch (e: Exception) {
             _state.update { it.copy(backendError = reasonMessage((e as? AttestException)?.reason ?: "NETWORK_ERROR")) }
+            // A free server may still be waking up: retry network failures a few times, 5/10/15/20 s apart.
+            if (((e as? AttestException)?.reason ?: "NETWORK_ERROR") == "NETWORK_ERROR" && attempt < 4) {
+                delay(5_000L * (attempt + 1))
+                refresh(attempt + 1)
+            }
         }
     }
 

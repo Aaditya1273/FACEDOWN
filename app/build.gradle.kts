@@ -30,8 +30,20 @@ android {
         }
     }
 
+    // Release signing comes from -Ppresence.releaseKeystore/-Alias/-Password (kept outside the repo).
+    val releaseKeystore = providers.gradleProperty("presence.releaseKeystore").orNull
+    signingConfigs {
+        if (releaseKeystore != null) create("release") {
+            storeFile = file(releaseKeystore)
+            storePassword = providers.gradleProperty("presence.releasePassword").get()
+            keyAlias = providers.gradleProperty("presence.releaseKeyAlias").get()
+            keyPassword = storePassword
+        }
+    }
+
     buildTypes {
         release {
+            if (releaseKeystore != null) signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
