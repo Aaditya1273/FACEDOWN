@@ -3,6 +3,7 @@ package com.presence
 import android.animation.AnimatorSet
 import android.animation.ObjectAnimator
 import android.graphics.Color
+import android.content.Intent
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
@@ -25,6 +26,8 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -55,7 +58,16 @@ import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    /** A mission to open on arrival, e.g. "urge-break" from the Urge Catcher. */
+    private val pendingMission = mutableStateOf<String?>(null)
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        intent.getStringExtra(EXTRA_MISSION)?.let { pendingMission.value = it }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
+        pendingMission.value = intent.getStringExtra(EXTRA_MISSION)
         // Native launch screen: white, the clock mark, its hand moves once (API 31+). Never held open:
         // the first frame replaces it as soon as it's drawn; data loads inside the app.
         installSplashScreen().setOnExitAnimationListener { splash ->
@@ -75,13 +87,22 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge(SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
             SystemBarStyle.light(Color.WHITE, Color.WHITE))
         val sender = ActivityResultSender(this)
-        setContent { ClockInTheme { ClockInRoot(sender) } }
+        setContent { ClockInTheme { ClockInRoot(sender, pendingMission) } }
+    }
+
+    companion object {
+        const val EXTRA_MISSION = "mission"
     }
 }
 
 @Composable
-fun ClockInRoot(sender: ActivityResultSender, vm: PresenceViewModel = hiltViewModel()) {
+fun ClockInRoot(sender: ActivityResultSender, pendingMission: MutableState<String?>,
+                vm: PresenceViewModel = hiltViewModel()) {
     val s by vm.state.collectAsStateWithLifecycle()
+    LaunchedEffect(pendingMission.value, s.missions) {
+        val id = pendingMission.value ?: return@LaunchedEffect
+        s.missions.firstOrNull { it.missionId == id }?.let { vm.openMission(it); pendingMission.value = null }
+    }
     val snackbar = remember { SnackbarHostState() }
 
     // Foreground continuity is evidence: report when the session screen leaves the foreground.

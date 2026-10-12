@@ -65,6 +65,14 @@ import com.presence.ui.theme.SemanticColors
 import com.presence.ui.theme.Spacing
 import java.text.DateFormat
 import android.Manifest
+import android.content.Intent
+import android.provider.Settings
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.semantics.Role
+import com.presence.urge.Urges
 import android.app.TimePickerDialog
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -266,6 +274,44 @@ private fun greeting(): String = when (java.util.Calendar.getInstance().get(java
     else -> "Good evening"
 }
 
+/** Pick apps to pause before; turning the service on happens in Android's Accessibility settings. */
+@Composable
+private fun UrgeCatcherSettings() {
+    val ctx = LocalContext.current
+    val apps = remember { Urges.installed(ctx) }
+    var watched by remember { mutableStateOf(Urges.watched(ctx)) }
+    var on by remember { mutableStateOf(Urges.enabled(ctx)) }
+    val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycle) { // re-check after the user comes back from Settings
+        val o = androidx.lifecycle.LifecycleEventObserver { _, e ->
+            if (e == androidx.lifecycle.Lifecycle.Event.ON_RESUME) on = Urges.enabled(ctx)
+        }
+        lifecycle.lifecycle.addObserver(o)
+        onDispose { lifecycle.lifecycle.removeObserver(o) }
+    }
+    Text("Before an app you pick opens, FACEDOWN asks: go facedown for 10 minutes instead? It only sees which " +
+        "app is opening, never what's on screen.", style = MaterialTheme.typography.bodyMedium, color = SemanticColors.SecondaryText)
+    Gap(8)
+    Group {
+        if (apps.isEmpty()) KeyValue("Apps", "None of the usual apps installed")
+        apps.entries.forEachIndexed { i, (pkg, name) ->
+            if (i > 0) Hairline()
+            Row(Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                .toggleable(pkg in watched, role = Role.Switch) { Urges.setWatched(ctx, pkg, it); watched = Urges.watched(ctx) },
+                verticalAlignment = Alignment.CenterVertically) {
+                Text(name, style = MaterialTheme.typography.bodyLarge, color = SemanticColors.PrimaryText, modifier = Modifier.weight(1f))
+                Switch(checked = pkg in watched, onCheckedChange = null,
+                    colors = SwitchDefaults.colors(checkedTrackColor = BrandColors.Green))
+            }
+        }
+    }
+    Gap(12)
+    if (on) Text("Urge Catcher is on.", style = MaterialTheme.typography.labelMedium, color = BrandColors.Green)
+    else SecondaryButton("Turn on in Accessibility settings") {
+        ctx.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    }
+}
+
 /** Book a daily time; the phone reminds you then. */
 @Composable
 private fun Appointment() {
@@ -432,6 +478,11 @@ private fun androidx.compose.foundation.layout.ColumnScope.ProfileTab(
     Gap(12)
     if (s.wallet == null) PrimaryButton("Connect wallet", loading = s.busy, onClick = onConnect)
     else SecondaryButton("Disconnect wallet", onClick = onDisconnect)
+
+    Gap(32)
+    SectionLabel("Urge Catcher")
+    Gap(8)
+    UrgeCatcherSettings()
 
     Gap(32)
     SectionLabel("Your knock")

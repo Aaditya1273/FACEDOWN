@@ -32,6 +32,38 @@
     "allowed_misses": 1
   },
   {
+    "mission_id": "urge-break",
+    "name": "Urge Break",
+    "description": "Ten minutes face-down instead of the app you were about to open. A sponsor pays a small reward.",
+    "steps": [
+      "Start; your wallet signs in once (no stake)",
+      "Lay the phone face-down with FACEDOWN open (the screen goes dark)",
+      "When it buzzes, knock on the back (2 checks, one in every 5 minutes)",
+      "Switching apps or missing a check ends the session unverified"
+    ],
+    "required_assurance": "P2",
+    "duration_seconds": 600,
+    "required_checkpoints": 2,
+    "checkpoint_interval_seconds": 300,
+    "min_interactions_per_checkpoint": 1,
+    "witness_required": false,
+    "max_claims_per_identity_per_day": 3,
+    "reward": {
+      "xp": 100,
+      "token": 0.2,
+      "symbol": "SKR"
+    },
+    "stake": {
+      "token": 0,
+      "bonus_rate": 0
+    },
+    "sponsor": "Sponsor pool",
+    "why": "Turns the urge itself into a verified session.",
+    "min_still_pct": 60,
+    "min_touch_motion": 150,
+    "allowed_misses": 1
+  },
+  {
     "mission_id": "quick-noloss",
     "name": "Quick Facedown",
     "description": "Lock 1 SKR for the session; you get it back whether you finish or not. Finish and a sponsor pays a reward and your streak grows.",

@@ -8,6 +8,19 @@
     <!-- Daily focus-appointment reminder (asked only when the user books a time). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- Android 11+ package visibility: the apps Urge Catcher can offer to watch (UrgeCatcher.kt). -->
+    <queries>
+        <package android:name="com.instagram.android" />
+        <package android:name="com.google.android.youtube" />
+        <package android:name="com.twitter.android" />
+        <package android:name="com.zhiliaoapp.musically" />
+        <package android:name="com.snapchat.android" />
+        <package android:name="com.facebook.katana" />
+        <package android:name="com.reddit.frontpage" />
+        <package android:name="in.mohalla.sharechat" />
+        <package android:name="com.android.chrome" />
+    </queries>
+
     <!-- Backups disabled: prefs hold the MWA auth token. -->
     <application
         android:name=".PresenceApp"
@@ -31,6 +44,23 @@
             </intent-filter>
         </activity>
         <receiver android:name=".FocusAppointment$Reminder" android:exported="false" />
+        <activity
+            android:name=".urge.InterceptActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity=""
+            android:theme="@style/Theme.ClockIn" />
+        <service
+            android:name=".urge.UrgeCatcherService"
+            android:exported="false"
+            android:label="FACEDOWN Urge Catcher"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data android:name="android.accessibilityservice" android:resource="@xml/urge_catcher" />
+        </service>
     </application>
 
 </manifest>
