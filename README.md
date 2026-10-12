@@ -1,101 +1,186 @@
-# FACEDOWN, built on PRESENCE
+<p align="center"><img src="docs/img/banner.png" alt="FACEDOWN: commit, put it down, prove it. Built on Solana, made for Seeker." width="100%"></p>
 
-**Put it down. Prove it. Get paid.**
-
-> FACEDOWN turns every urge to pick up your phone into proof that you didn't. Friends keep you honest, your SKR keeps
-> you committed, and your presence becomes a record no bot can fake.
-
-Seeker is the only phone that can prove you were present: a hardware-bound identity (Seeker Genesis Token), a
-wallet in the OS, and sensors that can tell a person from a script. FACEDOWN uses that to make phone-free time
-something you can commit to, verify and get paid for, with no referee.
-
-1. **All day: Presence Minutes.** Whenever the phone lies face-down and still, a ring on Today fills toward a
-   3-hour daily goal, without opening the app (opt-in, low assurance: no money).
-2. **The urge: Urge Catcher.** Open Instagram, YouTube or X and FACEDOWN pauses first: *go facedown 10 min instead?*
-   That turns the urge into a verified, sponsor-paid session; *Open anyway* works after 10 seconds.
-3. **Book a session.** A daily time (the phone reminds you) and a length: 2, 10, 25 min or a **Facedown Hour**.
-   Choose **Free** (a sponsor pays), **No-Loss** (lock SKR, get it back either way, only finishers earn) or
-   **Stake** (finish for stake + up to 20% from sponsors; **quit and it's locked for 7 days**, then 14, then 30, not lost).
-4. **Turn the phone face-down.** The screen goes black. It buzzes a few times at unpredictable moments; **knock on
-   the back** to answer (calibrated to your phone and table; one missed knock is forgiven). The accelerometer proves
-   the phone lay face-down and still and that each answer was a physical knock, not input injected by a script or an AI agent.
-5. **Finish.** The session is attested on Solana and paid in the same transaction. Your **squad** (3–8 friends) shares
-   one streak that breaks for everyone if anyone misses a day; a **streak freeze** (SKR, half burned on-chain) covers
-   one missed day. Today shows how many people are facedown right now.
-
-<p>
-<img src="screenshots/home.png" width="16%" alt="Today: Presence Minutes ring, 2/10/25/60 min, Free | No-Loss | Stake">
-<img src="screenshots/urge.png" width="16%" alt="Urge Catcher: go facedown 10 min instead of opening the app">
-<img src="screenshots/mission.png" width="16%" alt="Confirm: No-Loss terms before any wallet prompt">
-<img src="screenshots/facedown.png" width="16%" alt="Face-down: the screen goes black while the session runs">
-<img src="screenshots/receipt.png" width="16%" alt="Receipt: human touch and phone-down verified, recorded on Solana">
-<img src="screenshots/progress.png" width="16%" alt="Progress: squad streak and members, streak freezes">
+<p align="center">
+  <a href="https://youtu.be/TL2G2HT28qY"><b>Film (3 min)</b></a> ·
+  <a href="docs/whitepaper/presence_whitepaper.pdf"><b>Whitepaper</b></a> ·
+  <a href="#5-live-proof-on-solana-devnet"><b>Devnet proof</b></a> ·
+  <a href="#6-why-solana"><b>Why Solana</b></a> ·
+  <a href="#8-the-engine-presence"><b>Architecture</b></a> ·
+  <a href="#11-run-it"><b>Run it</b></a>
 </p>
 
-*Screenshots: Android emulator against **devnet** with Solana Mobile's test wallet, **development mode** (Seeker
-eligibility bypassed and labeled). Face-down and knocks were driven through the emulator's virtual accelerometer.
-The Urge Catcher screenshot uses Chrome as the watched app. Rewards are SKR-TEST, a valueless test mint with SKR's 6 decimals.*
+<p align="center">
+  <img src="https://img.shields.io/badge/Solana-devnet%20live-14F195?logo=solana&logoColor=white&labelColor=1D2B24" alt="Solana devnet live">
+  <img src="https://img.shields.io/badge/Seeker-made%20for-1F9D55?labelColor=1D2B24" alt="Made for Seeker">
+  <img src="https://img.shields.io/badge/Android-Kotlin%20%C2%B7%20Compose-3DDC84?logo=android&logoColor=white&labelColor=1D2B24" alt="Android Kotlin Compose">
+  <img src="https://img.shields.io/badge/Anchor-program-512DA8?labelColor=1D2B24" alt="Anchor program">
+  <img src="https://img.shields.io/badge/tests-46%20backend%20%C2%B7%2010%20Android-1F9D55?labelColor=1D2B24" alt="Tests">
+</p>
 
-## Why this, why now
+**FACEDOWN** turns the urge to pick up your phone into proof that you didn't. You book a session, lay the phone
+face-down, and knock on its back when it buzzes. The accelerometer proves a person was there, the server keeps the
+time, and the result is written to **Solana** in the same transaction that pays you. FACEDOWN is the first app on
+**PRESENCE**, an engine that proves *a human did this process on this device*, which no bot or AI phone agent can fake
+by tapping a screen.
 
-**The pain is real and people pay to fix it.** Blockers are too easy to undo in the moment, and they feel like
-deprivation. Commitment apps exist and charge for it, but they need a human or AI reviewer to check photo proof,
-and the money you forfeit goes to the company. **FACEDOWN needs neither: the phone proves it, and forfeits go to the
-people who finished** (or, in No-Loss, nothing is forfeited at all).
+<p align="center">
+  <a href="https://youtu.be/TL2G2HT28qY"><img src="docs/img/film.jpg" width="80%" alt="Watch the FACEDOWN film on YouTube"></a><br>
+  <sub>▶ <b>Watch the 3-minute film.</b> Every app screen in it is the real FACEDOWN app on Solana devnet.</sub>
+</p>
 
-**In a world of AI agents, proof that a human was here is the scarce thing.** Agents can now drive a phone (tap,
-type, approve) and farm anything that only checks taps. A motion signal separates human from agent-driven taps
-([arXiv 2609.02154](https://arxiv.org/abs/2609.02154)); FACEDOWN puts that signal inside a signed, hash-chained,
-on-chain process record. That's an anti-farming primitive, and Seeker is the phone that can carry it.
+<table><tr>
+<td width="150" align="center"><img src="app/src/main/res/drawable-nodpi/mascot_wave.webp" width="130" alt="Pip waving"></td>
+<td>
 
-## Designed from the evidence
+**Hi, I'm Pip.** I live inside FACEDOWN: I'm on the launch screen, I count down with you, and I celebrate when the
+server verifies your session. I'll walk you through this page. The short version: **phones are built to be picked up,
+and nothing holds you to the promise you made yourself. We built the thing that does, and we made it provable.**
 
-| Finding | What FACEDOWN does |
-|---|---|
-| Deposit programs were accepted by **13.7%** of people vs **90%** for reward programs; among people who'd accept either, deposits worked better (+13.2 pts). Halpern et al., [NEJM 2015](https://doi.org/10.1056/NEJMoa1414293), n = 2,538 | **Free first, No-Loss next, Stake for the committed.** |
-| A brief pause before opening an app made people open it less often (the "one sec" self-nudge app). Grüning, Riedel & Lorenz-Spreen, [PNAS 2023](https://doi.org/10.1073/pnas.2213114120) | **Urge Catcher**: the pause, plus a 10-minute facedown session instead. |
-| Appointments **more than doubled** uptake vs financial commitment devices, and most commitment-device takers lost their money. Derksen et al., [arXiv 2110.06876](https://arxiv.org/abs/2110.06876) | **Daily facedown appointment** with a reminder; No-Loss so nobody has to lose money to commit. |
-| People who **chose their own** phone-reduction goal cut use by **26 min/day more** (73% larger) than people assigned one. Sachdeva, Somasundaram & Sharma (IIM Udaipur, ISB), [Soc Sci Med 2026](https://doi.org/10.1016/j.socscimed.2026.119683) | You choose the length and what's at stake. |
-| Two weeks without mobile internet improved sustained attention and mental health; **91%** improved on at least one outcome. Castelo et al., [PNAS Nexus 2025](https://doi.org/10.1093/pnasnexus/pgaf017) | Long stretches matter, so there is a **Facedown Hour**, not just a pomodoro. |
-| A motion signal told **human from AI-agent** taps apart with 98.4% accuracy on a table. [arXiv 2609.02154](https://arxiv.org/abs/2609.02154); zkSENSE, [arXiv 1911.07649](https://arxiv.org/abs/1911.07649) | **Knock check-ins + face-down stillness** in every checkpoint. |
-| Play-/move-to-earn economies collapse; in 9 of 12 NFT games traders lost money on average. [arXiv 2602.13882](https://arxiv.org/abs/2602.13882) | **No new token, no emissions.** Rewards come only from sponsors and forfeited stakes. |
+</td></tr></table>
 
-## What a cheater would try
+---
+
+## 1. The problem
+
+<table><tr>
+<td width="55%" valign="top">
+
+**You know what you want to focus on. Your phone keeps winning anyway.**
+
+- **App blockers are one tap from off**, and they feel like punishment, so people turn them off at the exact moment
+  of the urge.
+- **Focus timers run on your own phone.** Nobody can check them, so nobody can back them with money or rewards.
+- **Commitment apps need a referee**: a friend, a human reviewer or an AI looking at photos. That costs money on every
+  claim, and the money you forfeit usually goes to the company.
+- **AI agents can now operate a phone.** They tap, type and approve. Any reward that only checks for taps on a screen
+  can be farmed by a bot ([Liu & Huang, arXiv 2609.02154](https://arxiv.org/abs/2609.02154)).
+
+**The missing piece is a commitment you can keep, and prove.**
+
+</td>
+<td width="45%"><img src="docs/img/gif/problem.gif" alt="Notifications pulling people away from what they meant to do, from the film"></td>
+</tr></table>
+
+## 2. The research
+
+Every product decision in FACEDOWN comes from a published study. Each number below is quoted from the paper's
+abstract; follow the links.
+
+<table><tr>
+<td width="45%"><img src="docs/img/gif/research.gif" alt="The research cards from the film: 91%, 26 min, 57%"></td>
+<td width="55%" valign="top">
+
+| | Finding | Source |
+|---|---|---|
+| **91%** | of people improved attention, mental health or well-being after 2 weeks without mobile internet (RCT) | Castelo et al., [PNAS Nexus 2025](https://doi.org/10.1093/pnasnexus/pgaf017) |
+| **26 min/day** | more phone time cut when people **chose their own** goal (73% larger; RCT, N = 149, 12 weeks) | Sachdeva, Somasundaram & Sharma (IIM Udaipur, ISB), [Soc Sci Med 2026](https://doi.org/10.1016/j.socscimed.2026.119683) |
+| **57%** | fewer openings of target apps with a short pause first (the *one sec* app) | Grüning, Riedel & Lorenz-Spreen, [PNAS 2023](https://doi.org/10.1073/pnas.2213114120) |
+| **90% vs 13.7%** | of people accepted reward programs vs deposit programs (n = 2,538); deposits worked better among those who took them (+13.2 pts) | Halpern et al., [NEJM 2015](https://doi.org/10.1056/NEJMoa1414293) |
+| **2×** | Appointments **more than doubled** uptake vs financial commitment devices; most commitment-device takers lost their money | Derksen et al., [arXiv 2110.06876](https://arxiv.org/abs/2110.06876) |
+| **+3.2 kg** | Group-pooled incentives beat individual ones for weight loss (95% CI 0.9–5.5) | Kullgren et al., [Ann Intern Med 2013](https://doi.org/10.7326/0003-4819-158-7-201304020-00002) |
+| **98.4%** | Accuracy of a motion signal at telling human from AI-agent-driven logins (table-top; 92.6% hand-held; 116 pilot sessions) | Liu & Huang, [arXiv 2609.02154](https://arxiv.org/abs/2609.02154) |
+| **9 of 12** | NFT play-to-earn games where trading players lost money on average | Gao et al., [arXiv 2602.13882](https://arxiv.org/abs/2602.13882) |
+
+</td></tr></table>
+
+<table><tr>
+<td width="150" align="center"><img src="app/src/main/res/drawable-nodpi/mascot_scientist.webp" width="130" alt="Pip the scientist"></td>
+<td>
+
+**Pip, reading the papers:** "Here's what the research told us to build. **Rewards first**, because almost nobody
+signs up to lose money (Halpern). **Daily appointments**, because they beat penalties (Derksen). **You pick the
+length**, because self-chosen goals work 73% better (Sachdeva). **A pause before the app opens**, because it halves
+openings (Grüning). **Squads**, because groups pull harder (Kullgren). And **no new token**, because emission-funded
+games leave players at a loss (Gao)."
+
+</td></tr></table>
+
+## 3. What FACEDOWN does
+
+| | Feature | How |
+|---|---|---|
+| ⏱️ | **Book a session** | A daily time with a reminder, and a length: **2, 10, 25 min or a Facedown Hour**. Pick **Free** (a sponsor pays), **No-Loss** (lock SKR, always get it back, only finishers earn) or **Stake** (finish for your stake back + up to 20% from sponsors). |
+| 📱 | **Put it face-down** | The screen goes black. The phone buzzes a few times at moments you can't predict; **knock on the back** to answer. One missed knock is forgiven. |
+| 🧪 | **Prove it** | The accelerometer proves the phone lay face-down and still, and that every answer was a physical knock, not input injected by a script or AI agent. The server times everything on its own clock. |
+| ⛓️ | **Get paid on-chain** | The verified session is attested on Solana and paid **in the same transaction**. Anyone can check it on Explorer. |
+| 🔒 | **Cool-down Lock** | Quit a Stake session and your stake is **locked for 7 days** (14, then 30 for repeat quits), then it comes back. Never lost, never given to anyone else. |
+| 🛑 | **Urge Catcher** | Open Instagram, YouTube or X and FACEDOWN pauses first: *go facedown 10 min instead?* *Open anyway* unlocks after 10 seconds. |
+| 🟢 | **Presence Minutes** | Whenever the phone lies face-down and still, a ring on Today fills toward a 3-hour daily goal, without opening the app. |
+| 👥 | **Squads** | 3–8 friends share **one streak** that breaks for everyone if anyone misses a day. A **streak freeze** (2 SKR, half burned on-chain) covers one missed day. |
+
+<p align="center">
+<img src="screenshots/home.png" width="15.5%" alt="Today: Presence Minutes ring, 2/10/25/60 min, Free | No-Loss | Stake">
+<img src="screenshots/urge.png" width="15.5%" alt="Urge Catcher: go facedown 10 min instead of opening the app">
+<img src="screenshots/mission.png" width="15.5%" alt="Confirm: No-Loss terms before any wallet prompt">
+<img src="screenshots/facedown.png" width="15.5%" alt="Face-down: the screen goes black while the session runs">
+<img src="screenshots/receipt.png" width="15.5%" alt="Receipt: human touch and phone-down verified, recorded on Solana">
+<img src="screenshots/progress.png" width="15.5%" alt="Progress: squad streak and members, streak freezes">
+<br><sub>Today · Urge Catcher · Confirm · Face-down · Receipt · Progress. Android emulator on <b>devnet</b>, development mode
+(Seeker check bypassed and labelled). Rewards are SKR-TEST, a valueless test mint.</sub>
+</p>
+
+## 4. FACEDOWN in four moments
+
+<table>
+<tr>
+<td width="50%" valign="top">
+
+**① Choose how long, and what's at stake.** 2, 10, 25 or 60 minutes. Free, No-Loss or Stake, with the exact terms
+on screen before any wallet prompt. Your wallet signs once.
+
+<img src="docs/img/gif/how.gif" alt="Choosing length and stake in the app">
+
+</td>
+<td width="50%" valign="top">
+
+**② Put it face-down, knock when it buzzes.** The screen goes dark. Check-ins come at unpredictable moments; a knock
+on the back answers without picking the phone up.
+
+<img src="docs/img/gif/facedown.gif" alt="The phone face-down; knock on the back when it buzzes">
+
+</td>
+</tr>
+<tr>
+<td valign="top">
+
+**③ The server verifies, the flame lights.** Server-timed duration, every hash in the evidence chain, human touch and
+phone-down. Then the stake comes back with a bonus, on Solana.
+
+<img src="docs/img/gif/verified.gif" alt="Session verified: the flame lights and the outcome is recorded on Solana">
+
+</td>
+<td valign="top">
+
+**④ Bring friends, catch the urge.** A squad shares one streak. Reach for a distracting app and FACEDOWN asks first.
+
+<img src="docs/img/gif/squad.gif" alt="Squad: one streak together">
+<img src="docs/img/gif/urge.gif" alt="Urge Catcher: FaceDown asks first">
+
+</td>
+</tr>
+</table>
+
+<table><tr>
+<td width="150" align="center"><img src="app/src/main/res/drawable-nodpi/mascot_guard.webp" width="130" alt="Pip on guard"></td>
+<td>
+
+**Pip, on guard duty:** "People ask me: *can't you just cheat?* Try it. Here's what happens."
+
+</td></tr></table>
 
 | Attempt | Why it fails |
 |---|---|
 | Fake the timer / fast-forward | The **server** times the session from its own clock. Checkpoints that arrive early are rejected. |
-| Use the phone during the session | Leaving the app is recorded in every checkpoint; one miss fails the session. Picking the phone up breaks face-down stillness. |
-| Let a script or an AI phone agent answer | Answers are knocks felt by the accelerometer (or a finger tap's jolt). Injected input moves nothing: production rejects it (`AUTOMATION_DETECTED`). Reproduced on the emulator with adb-injected taps. |
-| Replay or forge evidence | Checkpoints form a hash chain signed by a per-session Android Keystore key bound into the wallet's sign-in. |
+| Use the phone during the session | Leaving the app is recorded in every checkpoint and fails the session. Picking the phone up breaks face-down stillness. |
+| Let a script or an AI phone agent answer | Answers are knocks felt by the accelerometer (or a finger tap's jolt). Injected input moves nothing: production rejects it (`AUTOMATION_DETECTED`). **Measured on a real phone below.** |
+| Replay or forge evidence | Checkpoints form a SHA-256 hash chain signed by a per-session Android Keystore key bound into the wallet's sign-in. |
 | Farm sponsor pools with many wallets | One claim per **Seeker Genesis Token** per mission per day: a device, not a wallet. |
 | Swap the stake transaction in the wallet | ATTEST submits the stake only if it moves exactly what was issued; wallets may add priority fees, nothing else. |
 | Claim the payout twice | Payout and attestation are one transaction on a PDA that can be created once. |
 
-## SKR: a reason to hold and spend it, not just pass it through
+## 5. Live proof on Solana devnet
 
-```mermaid
-flowchart LR
-    U[You] -- Stake / No-Loss lock, signed in MWA --> P[(Pool account)]
-    S[Sponsor] -- funds Free + No-Loss rewards --> P
-    U -- face-down session, knock check-ins --> A[ATTEST engine]
-    A -- verified: one tx --> C[(Solana)]
-    C -- attestation + stake back + reward --> U
-    Q[Quitter] -. Stake: locked 7/14/30 days, then returned .-> U
-    Q -. No-Loss: refunded .-> U
-    U -- streak freeze, 2 SKR --> F{{half burned, half revenue}}
-```
-
-- **Stake** (opt-in): finishers get stake + up to 20% from **sponsor** pools, capped by what the pool holds (shown
-  live). **Quitting locks the stake** for 7 days, 14 for a second quit within 30 days, then 30, and then it comes back.
-  Loss aversion without a gamble: nobody else ever wins your stake.
-- **No-Loss** (default for money): the stake is locked and returned either way (refund on failure; abandoned sessions
-  are refunded after they expire). Finishing earns the sponsor reward and keeps the streak. Nobody loses principal.
-- **Streak freeze** (a sink): 2 SKR, **half burned on-chain** (`BurnChecked`), half protocol revenue.
-- **Real SKR** is `SKRbvo6Gf7GondiT3BbTfuRDPqLWei4j2Qy2NPGZhW3` (6 decimals). Everything is transfer-based, so
-  pointing `REWARD_MINT` at it is the mainnet switch.
-
-## Devnet proof (every row is a real transaction)
+Every row is a real transaction. Click through to Solana Explorer.
 
 | | |
 |---|---|
@@ -125,72 +210,211 @@ Earlier face-up build on the same phone (Oct 11): stake [yKF8…8qnt](https://ex
 - Solflare sometimes called a devnet stake "for mainnet". Building stakes on a finalized blockhash made it go away;
   our reading is that its RPC hadn't seen a just-confirmed hash yet, but that's not confirmed.
 
-## The business: FACEDOWN is the first app, PRESENCE is the company
+### What we measured
 
-- **Consumer (FACEDOWN):** sponsor-funded Free and No-Loss tiers for reach; streak freezes as an SKR sink and
-  revenue; later a Pro tier and a small rake on opt-in Stake pools (where legal).
-- **Infrastructure (PRESENCE):** "a human did this process on this device", verifiable on-chain by anyone through
-  `verifyPresence()` ([docs/integration.md](docs/integration.md)). Every airdrop is a Sybil problem and every quest
-  program is a farming problem; PRESENCE sells proof-of-human-process per attestation to airdrop issuers, quest
-  platforms and Seeker campaigns ("5 verified facedown sessions" is a quest a bot can't farm).
+From the devnet database (9–12 Oct 2026: **56 sessions, 20 wallets, 19 settled, 9 rejected**) and the
+[whitepaper](docs/whitepaper/presence_whitepaper.pdf):
+
+<table><tr>
+<td width="50%"><img src="docs/img/charts/touch_motion.png" alt="Touch motion: injected taps on a real phone fall below the 150 mm/s² floor"></td>
+<td width="50%" valign="top">
+
+**Scripts get caught by physics, not by timing.** Our real-phone runs were driven by `adb input tap`, the same kind
+of injected input a bot or AI agent produces. **29 of 30 injected taps** read 20–115 mm/s² of motion (median 35.5)
+against a 150 mm/s² human-touch floor, so all 8 of those sessions would be rejected in production. Their answer
+*timing* looked perfectly human: timing alone catches nothing.
+
+**And we say where it breaks.** The emulator's virtual accelerometer passes easily (2,189 mm/s²). A device that lies
+about its own sensors beats the check today. Hardware attestation is the fix (P4 on the roadmap).
+
+</td></tr></table>
+
+| Measured | Result |
+|---|---|
+| Rejections in the deployment | 7 for leaving the app, 2 for missed check-ins, 0 for timing |
+| Answer time to a check-in | median 3.07 s, min 344 ms (none under the 150 ms human floor) |
+| Verify a session (hash chain + 9-clause policy) | **16 µs** median for 4 checkpoints, linear in length |
+| Cost of one verified session on Solana | **1 transaction, 1 signature, 27–30k compute units, 0.00144 SOL**, paid by the operator, not the user |
+| Backend tests | 46 pass (2 skipped): protocol, replay, policy, physical evidence, stakes, No-Loss, cool-down, freezes, squads |
+
+## 6. Why Solana
+
+<p align="center"><img src="docs/img/solana.svg" width="72" alt="Solana logo"></p>
+
+<table><tr>
+<td width="45%"><img src="docs/img/gif/solana.gif" alt="Why Solana: proof on chain, real humans, no new token, built for Seeker"></td>
+<td width="55%" valign="top">
+
+FACEDOWN only works on a chain where **the phone itself is part of the network**. On Solana it is:
+
+- **Seeker gives the phone an on-chain identity.** The Seeker Genesis Token is a Token-2022 NFT issued to each
+  Seeker device. We key claims to it, so **one device = one claim**, however many wallets a farmer creates.
+- **The wallet lives in the OS.** Mobile Wallet Adapter lets the app ask Solflare (or any MWA wallet) to sign in and
+  stake without leaving FACEDOWN. We tested it with the real Solflare app.
+- **Proof and payout in one transaction.** `record_attestation` + the SPL transfer land together, 27–30k compute
+  units, **0.00144 SOL** all-in (measured). Cheap enough to attest a **2-minute** session, and atomic: no paid-but-not-
+  recorded state.
+- **A PDA is a free "only once" lock.** The attestation address is derived from (profile, mission, day, claim index).
+  It can be created once, ever, so double-claiming is impossible by construction, not by a database check.
+- **SKR gives the token a job.** Stake it, lock it, burn half of every streak freeze, and (roadmap) stake it behind
+  independent Guardians that co-sign attestations, the same model Solana Mobile uses for its own Guardians.
+- **The Solana dApp Store allows what Play restricts.** Urge Catcher is an accessibility service: allowed on the dApp
+  Store, restricted on Google Play.
+- **Composable proof.** Any airdrop, quest or campaign can read `DailyAttestation` accounts or call
+  [`verifyPresence()`](docs/integration.md) to require *real human sessions*.
+
+</td></tr></table>
+
+## 7. SKR: a reason to hold and spend it, not just pass it through
+
+```mermaid
+flowchart LR
+    U[You] -- Stake / No-Loss lock, signed in MWA --> P[(Pool account)]
+    S[Sponsor] -- funds Free + No-Loss rewards --> P
+    U -- face-down session, knock check-ins --> A[ATTEST engine]
+    A -- verified: one tx --> C[(Solana)]
+    C -- attestation + stake back + reward --> U
+    Q[Quitter] -. Stake: locked 7/14/30 days, then returned .-> U
+    Q -. No-Loss: refunded .-> U
+    U -- streak freeze, 2 SKR --> F{{half burned, half revenue}}
+```
+
+| | Free | No-Loss | Stake |
+|---|---|---|---|
+| **At risk** | nothing | your stake, during the session | your stake |
+| **Finish** | sponsor reward | stake back + sponsor reward | stake back + up to 20% from the sponsor pool |
+| **Quit** | nothing | stake refunded | stake **locked 7 days** (14, then 30), then returned |
+
+<table><tr>
+<td width="60%"><img src="docs/img/charts/cooldown.png" alt="Cool-down lock schedule and expected cost vs forfeiture"></td>
+<td width="40%" valign="top">
+
+**Loss aversion without a gamble.** Classic commitment contracts take your money when you fail. FACEDOWN locks it
+instead. The money cost of quitting is the time value of a short lock: **under 1% of a forfeit** at a 10% yearly rate.
+What's left is the feeling of not having it, which is the point.
+
+**Nobody's stake is ever paid to anyone else.** Rewards come only from sponsors, so FACEDOWN is designed to stay outside
+"online money game" under India's 2025 online gaming law. That's our reading, not legal advice; it needs review before
+a public launch.
+
+- **Real SKR** is `SKRbvo6Gf7GondiT3BbTfuRDPqLWei4j2Qy2NPGZhW3` (6 decimals). Everything is transfer-based, so pointing
+  `REWARD_MINT` at it is the mainnet switch.
+
+</td></tr></table>
+
+<table><tr>
+<td width="150" align="center"><img src="app/src/main/res/drawable-nodpi/mascot_coach.webp" width="130" alt="Pip the coach"></td>
+<td>
+
+**Pip, talking business:** "FACEDOWN is the first app. **PRESENCE is the company.** Every airdrop is a Sybil problem
+and every quest program is a farming problem. We sell the answer: *a real human did this, on this device*, provable by
+anyone on-chain."
+
+</td></tr></table>
+
+## The business
+
+- **Consumer (FACEDOWN):** sponsor-funded Free and No-Loss tiers for reach; streak freezes as an SKR sink and revenue;
+  later a Pro tier and a small rake on opt-in Stake pools (where legal).
+- **Infrastructure (PRESENCE):** proof-of-human-process per attestation, sold to airdrop issuers, quest platforms and
+  Seeker campaigns. "5 verified facedown sessions" is a quest a bot can't farm.
 - **Sponsors:** parents funding a student's pool, companies funding employees' focus hours, protocols funding
   campaigns. Sponsor deposits are verified on-chain before they're credited.
+- **No new token, no emissions.** Rewards are transfers from sponsor pools, so the economy can't inflate away.
 
-## The engine: PRESENCE
+## 8. The engine: PRESENCE
+
+```mermaid
+sequenceDiagram
+    participant App as FACEDOWN app
+    participant W as Wallet (MWA)
+    participant A as ATTEST server
+    participant S as Solana
+    App->>A: request session
+    A-->>App: nonce + Sign-In-With-Solana message (incl. ephemeral key)
+    App->>W: sign in (and stake, if Stake / No-Loss)
+    W-->>A: signature (+ signed stake tx, checked then submitted)
+    loop every window, server-timed
+        App->>A: checkpoint: hash-chained, key-signed, motion summaries
+    end
+    App->>A: submit
+    A->>A: re-derive chain, 9-clause policy on server clock
+    A->>S: record_attestation + payout (one transaction)
+    S-->>App: receipt, visible on Explorer
+```
 
 - **Client collects, ATTEST decides, chain anchors.** The app never sends `verified`, `reward` or `assurance`.
 - **Evidence chain.** `checkpoint_i = SHA256("PRESENCE/cp/v3" | prev | "{i}|{ts}|{elapsed}|{fg}|{taps}|{response_ms}|{still_pct}|{touch_motion}" | nonce)`,
   identical in Kotlin and Python (shared golden vectors).
-- **Privacy.** Per window: a foreground flag, an answer count, one answer time and two motion summaries (how much of
-  the time the phone lay still and face-down, how hard the knock was). Raw sensor data stays on the phone. No
-  location, contacts, camera or microphone. Only a 32-byte root goes on-chain.
+- **Privacy.** Per window: a foreground flag, an answer count, one answer time and two motion summaries. Raw sensor data
+  stays on the phone. No location, contacts, camera or microphone. Only a 32-byte root goes on-chain.
 - **Assurance levels.** P1 = wallet sign-in + Seeker Genesis Token, P2 = P1 + process evidence. P3 (witnesses) and
   P4 (hardware attestation) are designed, not built.
+
+<table><tr>
+<td width="50%"><img src="docs/img/charts/risk_surface.png" alt="Automation risk surface with devnet sessions"></td>
+<td width="50%" valign="top">
+
+**The full maths is in the [whitepaper](docs/whitepaper/presence_whitepaper.pdf)** (14 pages): the threat model, the
+9-clause server predicate, the knock and stillness detectors, the automation-risk score, the evidence chain, pool and
+cool-down economics, streak survival, the on-chain uniqueness rule, measured results and a ranked list of limitations.
 
 Docs: [architecture](docs/architecture.md) · [trust model](docs/trust-model.md) ·
 [evidence](docs/evidence-model.md) · [security](docs/security.md) · [missions](docs/mission-policy.md) ·
 [integration](docs/integration.md) · [demo script](docs/demo.md)
 
-## Roadmap (designed, not built)
+</td></tr></table>
 
-- **Yield-funded No-Loss.** On mainnet, locked stakes can earn yield (e.g. a USDC/SOL lending vault) that funds the
+## 9. Roadmap (designed, not built)
+
+- **P4 hardware attestation.** Android Key Attestation for the session key, so a phone that lies about its sensors is
+  refused. Closes the biggest gap we measured.
+- **Guardian quorum.** Several attestors staking SKR instead of one operator, each re-checking the same evidence
+  ([trust-model.md](docs/trust-model.md)).
+- **Yield-funded No-Loss.** On mainnet, locked stakes earn yield (e.g. a USDC/SOL lending vault) that funds the
   finisher reward instead of sponsors. Not built: no such vault on devnet to test against.
-- **ORE sponsor pools ("your focus fills an ORE jar").** A mission whose reward mint is ORE, funded by an ORE
-  sponsor, so finishers accumulate ORE as savings. We deliberately do *not* deploy users' SOL into ORE mining rounds
-  on their behalf: that is a game of chance and would undo No-Loss. Not built: ORE (`oreV3EG1i9BEgiAJ8b177Z2S2rMarzak4NMv1kULvWv`)
-  runs on mainnet only, and per-mission reward mints need a settlement change.
+- **ORE sponsor pools ("your focus fills an ORE jar").** A mission whose reward mint is ORE, funded by an ORE sponsor.
+  We deliberately do *not* deploy users' SOL into ORE mining rounds: that is a game of chance and would undo No-Loss.
+  ORE runs on mainnet only.
 - **Presence Model.** Replace the hand-tuned knock/stillness thresholds with a small on-device classifier trained on
   real session traces (opt-in). Not built: we don't have the data yet, and a model without data would be theatre.
 - **Share a receipt as a Solana Blink** so anyone can join your squad or challenge you from X.
-- **Presence Passport.** A monthly soulbound badge for verified presence and a score other apps read through
-  `verifyPresence()` (e.g. quests and airdrops weighted by proof of a real human).
+- **Presence Passport.** A monthly soulbound badge for verified presence that other apps read through `verifyPresence()`.
 - **Urge Forecast.** Suggest Facedown Hours from the phone's own usage stats (the hours you lose most).
 - **Pledge mode.** Quitting sends the stake to a cause you pick instead of locking it (needs legal review).
-- **Guardian quorum.** Several attestors staking SKR instead of one operator ([trust-model.md](docs/trust-model.md)).
 
-## Honest limitations
+<table><tr>
+<td width="150" align="center"><img src="app/src/main/res/drawable-nodpi/mascot_thinking.webp" width="130" alt="Pip thinking"></td>
+<td>
+
+**Pip, being honest:** "Read this before you quote us. We'd rather you hear the limits from us."
+
+</td></tr></table>
+
+## 10. Honest limitations
 
 - **Real phone: yes. Real knocks: not yet.** Free, No-Loss, Stake, Cool-down, freezes and squads ran on a real
   realme phone with Solflare on devnet (table above), with check-ins answered by on-screen taps. Face-down and knock
   detection were verified on the emulator's virtual accelerometer; a calibrated real-knock session is still to do.
   Seeker Genesis Token verification is implemented and unit-tested but not run on a Seeker.
 - **Knock thresholds need real data.** Each user calibrates their own knock (half their median, never below
-  0.2 m/s²); the server's human-touch floor is 150 mm/s². On a real phone, injected taps still read 20–90 mm/s² of noise
-  (one 734 outlier). A measured table across surfaces and phones is still to do.
+  0.2 m/s²); the server's human-touch floor is 150 mm/s². On a real phone, injected taps read 20–115 mm/s² (one 734
+  outlier). A measured table across surfaces and phones is still to do.
+- **Signals, not proof.** A modified device could fabricate the motion numbers (the emulator does); only hardware
+  attestation (P4) closes that.
 - **This phone, not you.** It proves *this* device lay face-down with a person answering. It can't stop you using a
   second phone. In No-Loss you only cheat yourself; in sponsored pools the Genesis Token caps it to one device.
-- **Signals, not proof.** A modified app could fabricate the motion numbers; only hardware attestation (P4) closes that.
-- **Indian law.** Rewards come only from sponsors and nobody's stake is ever paid to someone else (No-Loss refunds,
-  Stake locks then returns), which is designed to stay outside "online money game" under India's 2025 online gaming
-  law. That's our reading, not legal advice; it needs review before a public launch.
+- **The behavioural effect of FACEDOWN itself is unmeasured.** We cite trials of related interventions; we haven't run
+  our own yet.
+- **Indian law.** Rewards come only from sponsors and nobody's stake is ever paid to someone else, which is designed to
+  stay outside "online money game" under India's 2025 online gaming law. That's our reading, not legal advice.
 - **Presence Minutes and Urge Catcher were verified on the emulator only.** The emulator stops sensor delivery
   with its screen off, so screen-off sampling on real phones still needs checking. Urge Catcher is an accessibility
-  service the user switches on in Android settings (some phones, like realme, don't let adb do it): allowed on the
-  Solana dApp Store, restricted on Google Play.
-- **Single operator.** One attestor key and one ATTEST server.
+  service the user switches on in Android settings (some phones, like realme, don't let adb do it).
+- **Single operator.** One attestor key and one ATTEST server, run locally for these tests (not publicly deployed).
 - **Test tokens only.** Devnet and localnet use SKR-TEST and a dev-only faucet, which the server refuses on mainnet.
 
-## Run it
+## 11. Run it
 
 ```bash
 . scripts/toolchain.env
@@ -204,7 +428,7 @@ Install Solana Mobile's `fakewallet-v1-debug.apk`
 are funded by the dev faucet on connect. For devnet: `scripts/devnet_setup.sh`, then `scripts/fund_pool.sh`.
 On the emulator, `adb emu sensor set acceleration 0:0:-9.81` turns the phone face-down.
 
-## Tests
+### Tests
 
 ```bash
 cd backend && uv run pytest -q                 # 46 tests: protocol, replay, policy, physical evidence, N-1, stakes, No-Loss, cool-down, freezes, squads
@@ -214,3 +438,24 @@ anchor test --validator legacy                 # program: attestor auth, day ran
 python3 scripts/device_e2e.py <adb-serial> happy free leave   # drives the real app + wallet on a device/emulator
 ATTEST_ENFORCE_PHYSICAL=true scripts/dev_stack.sh   # then `device_e2e.py emulator-5554 free`: injected taps are rejected
 ```
+
+## Credits
+
+- **Film:** stock footage from [Pexels](https://www.pexels.com) (Pexels License); music "Mountains" by Andrew Ev
+  ([Mixkit](https://mixkit.co) licence); voice by Kokoro-82M TTS (Apache-2.0). Every app screen is the real app.
+- **Fonts:** Manrope and Inter (SIL OFL). **Solana logo:** from Solana's brand assets.
+- **AI tools:** Claude Code (Anthropic) wrote much of the code, tests, docs, whitepaper and film under the team's
+  direction and review.
+
+## Team WARRIO
+
+- **Aaditya** (iocryp15), lead · [@Aaditya1273](https://github.com/Aaditya1273)
+- **nebula10**
+
+<table><tr>
+<td width="150" align="center"><img src="app/src/main/res/drawable-nodpi/mascot_champion.webp" width="130" alt="Pip celebrating"></td>
+<td>
+
+**Pip, signing off:** "Put it down. Prove it. Start with 2 minutes."
+
+</td></tr></table>
