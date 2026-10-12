@@ -73,6 +73,9 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.semantics.Role
 import com.presence.urge.Urges
+import com.presence.PresenceMinutes
+import com.presence.ui.components.ProgressRing
+import androidx.compose.runtime.LaunchedEffect
 import android.app.TimePickerDialog
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -144,6 +147,8 @@ private fun androidx.compose.foundation.layout.ColumnScope.Today(
             }
         }
 
+        Gap(20)
+        PresenceRing()
         s.profile?.takeIf { it.streak > 0 }?.let {
             Gap(24)
             StreakLine(it)
@@ -272,6 +277,32 @@ private fun greeting(): String = when (java.util.Calendar.getInstance().get(java
     in 5..11 -> "Good morning"
     in 12..16 -> "Good afternoon"
     else -> "Good evening"
+}
+
+/** Today's Presence Minutes against the daily goal; opt-in, because it samples the sensor all day. */
+@Composable
+private fun PresenceRing() {
+    val ctx = LocalContext.current
+    var on by remember { mutableStateOf(PresenceMinutes.enabled(ctx)) }
+    var minutes by remember { mutableStateOf(PresenceMinutes.today(ctx)) }
+    LaunchedEffect(on) { while (on) { minutes = PresenceMinutes.today(ctx); kotlinx.coroutines.delay(30_000) } }
+    Row(Modifier.fillMaxWidth().border(1.dp, SemanticColors.Border, Shapes.standard).padding(Spacing.standard),
+        verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(56.dp), contentAlignment = Alignment.Center) {
+            ProgressRing((minutes / PresenceMinutes.GOAL_MINUTES.toFloat()).coerceIn(0f, 1f), Modifier.size(56.dp))
+            Text("${minutes * 100 / PresenceMinutes.GOAL_MINUTES}%", style = MaterialTheme.typography.labelMedium,
+                color = SemanticColors.PrimaryText)
+        }
+        Spacer(Modifier.size(Spacing.standard))
+        Column(Modifier.weight(1f)) {
+            Text("Facedown today: ${minutes / 60} h ${minutes % 60} min", style = MaterialTheme.typography.titleMedium,
+                color = SemanticColors.PrimaryText)
+            Text(if (on) "Goal ${PresenceMinutes.GOAL_MINUTES / 60} h. Counted whenever the phone lies face-down and still."
+                else "Count face-down time all day, even without a session.",
+                style = MaterialTheme.typography.bodyMedium, color = SemanticColors.SecondaryText)
+        }
+        if (!on) TextAction("Turn on") { PresenceMinutes.setEnabled(ctx, true); on = true }
+    }
 }
 
 /** Pick apps to pause before; turning the service on happens in Android's Accessibility settings. */

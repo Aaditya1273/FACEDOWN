@@ -7,6 +7,10 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <!-- Daily focus-appointment reminder (asked only when the user books a time). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Re-arm the appointment reminder and Presence Minutes sampling after a reboot. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Held for ~1.5 s per Presence Minutes sample: screen-off sensors only report while the CPU is awake. -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <!-- Android 11+ package visibility: the apps Urge Catcher can offer to watch (UrgeCatcher.kt). -->
     <queries>
@@ -44,6 +48,12 @@
             </intent-filter>
         </activity>
         <receiver android:name=".FocusAppointment$Reminder" android:exported="false" />
+        <receiver android:name=".PresenceMinutes$Sampler" android:exported="false" />
+        <receiver android:name=".PresenceMinutes$Boot" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
         <activity
             android:name=".urge.InterceptActivity"
             android:excludeFromRecents="true"

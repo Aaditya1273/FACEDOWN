@@ -16,8 +16,7 @@ import java.util.Calendar
  * follow-through compared with financial commitment devices (Derksen et al., arXiv 2110.06876).
  * It's only a reminder; the server neither knows nor enforces it.
  *
- * ponytail: inexact alarm (no exact-alarm permission) and not restored after a reboot; add a
- * BOOT_COMPLETED receiver if appointments matter across restarts.
+ * ponytail: inexact alarm (no exact-alarm permission); re-armed after a reboot by PresenceMinutes.Boot.
  */
 object FocusAppointment {
     private const val PREFS = "presence"
