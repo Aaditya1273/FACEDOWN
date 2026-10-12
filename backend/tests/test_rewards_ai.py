@@ -218,3 +218,29 @@ def test_streak_freeze_is_paid_in_skr_half_burned_and_covers_a_missed_day(api, c
     s2 = start(api, d); run_process(api, s2, clock); submit_and_verify(api, s2)
     p = api.get(f"/profile/{d.wallet}").json()
     assert p["streak"] == 2 and p["streak_freezes"] == 0
+
+
+def test_squad_streak_needs_everyone_and_breaks_when_one_misses(api, clock):
+    a, b = SimDevice(), SimDevice()
+    sq = api.post("/squads", json={"wallet": a.wallet, "name": "Hostel 4"}).json()
+    assert sq["size"] == 1 and len(sq["code"]) == 6
+    assert api.post("/squads/join", json={"wallet": b.wallet, "code": sq["code"].lower()}).json()["size"] == 2
+    assert api.post("/squads/join", json={"wallet": b.wallet, "code": sq["code"]}).status_code == 409  # one squad each
+
+    def finish(d):
+        s = start(api, d); run_process(api, s, clock); submit_and_verify(api, s)
+
+    finish(a)
+    view = api.get(f"/squads/{a.wallet}").json()
+    assert view["done_today"] == 1 and view["streak"] == 0  # b hasn't gone facedown yet
+    finish(b)
+    assert api.get(f"/squads/{a.wallet}").json()["streak"] == 1
+    clock.advance(86_400)
+    finish(a); finish(b)
+    assert api.get(f"/squads/{b.wallet}").json()["streak"] == 2
+    clock.advance(86_400)
+    finish(a)  # b misses today: the streak still stands until the day is over...
+    assert api.get(f"/squads/{a.wallet}").json()["streak"] == 2
+    clock.advance(86_400)
+    assert api.get(f"/squads/{a.wallet}").json()["streak"] == 0  # ...then it breaks for everyone
+    assert api.get(f"/squads/{SimDevice().wallet}").json() is None

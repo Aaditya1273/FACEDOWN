@@ -85,6 +85,18 @@ CREATE TABLE IF NOT EXISTS profiles (
   last_day INTEGER,
   freezes INTEGER NOT NULL DEFAULT 0
 );
+-- Squads: 3-8 friends sharing one streak. One squad per wallet.
+CREATE TABLE IF NOT EXISTS squads (
+  id TEXT PRIMARY KEY,
+  code TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  created_at REAL NOT NULL
+);
+CREATE TABLE IF NOT EXISTS squad_members (
+  squad_id TEXT NOT NULL REFERENCES squads(id),
+  wallet TEXT NOT NULL UNIQUE,
+  joined_day INTEGER NOT NULL
+);
 -- Streak freezes bought with SKR: user -> pool transfer, half of it burned.
 CREATE TABLE IF NOT EXISTS freeze_orders (
   id TEXT PRIMARY KEY,

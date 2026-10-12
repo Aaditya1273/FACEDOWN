@@ -549,6 +549,62 @@ class Attest:
         return {"freezes": p.freezes, "payment_signature": pay_sig, "burn_signature": burn_sig,
                 "burned": burn / 10 ** self._decimals() if burn_sig else 0}
 
+    SQUAD_MAX = 8
+
+    def squad_create(self, wallet: str, name: str) -> dict:
+        identity.decode_wallet(wallet)
+        if self.db.execute("SELECT 1 FROM squad_members WHERE wallet=?", (wallet,)).fetchone():
+            raise AttestError(Reason.INVALID_STATE, "already in a squad")
+        squad_id, code = str(uuid.uuid4()), secrets.token_hex(3).upper()  # 6-character invite code
+        with self.db:
+            self.db.execute("INSERT INTO squads VALUES (?,?,?,?)", (squad_id, code, name.strip()[:40] or "Squad", self.clock()))
+            self.db.execute("INSERT INTO squad_members VALUES (?,?,?)", (squad_id, wallet, utc_day(self.clock())))
+        return self.squad(wallet)
+
+    def squad_join(self, wallet: str, code: str) -> dict:
+        identity.decode_wallet(wallet)
+        row = self.db.execute("SELECT id FROM squads WHERE code=?", (code.strip().upper(),)).fetchone()
+        if row is None:
+            raise AttestError(Reason.SESSION_NOT_FOUND, "no squad with that code")
+        if self.db.execute("SELECT 1 FROM squad_members WHERE wallet=?", (wallet,)).fetchone():
+            raise AttestError(Reason.INVALID_STATE, "already in a squad")
+        if self.db.execute("SELECT COUNT(*) FROM squad_members WHERE squad_id=?", (row["id"],)).fetchone()[0] >= self.SQUAD_MAX:
+            raise AttestError(Reason.INVALID_STATE, f"squad is full ({self.SQUAD_MAX})")
+        with self.db:
+            self.db.execute("INSERT INTO squad_members VALUES (?,?,?)", (row["id"], wallet, utc_day(self.clock())))
+        return self.squad(wallet)
+
+    def squad(self, wallet: str) -> dict | None:
+        """The wallet's squad: members, who is facedown now, who has a verified session today, and the
+        squad streak (consecutive days on which every member who had joined verified at least once)."""
+        row = self.db.execute("SELECT s.* FROM squads s JOIN squad_members m ON m.squad_id=s.id WHERE m.wallet=?",
+                              (wallet,)).fetchone()
+        if row is None:
+            return None
+        members = self.db.execute("SELECT wallet, joined_day FROM squad_members WHERE squad_id=? ORDER BY joined_day",
+                                  (row["id"],)).fetchall()
+        today, now = utc_day(self.clock()), self.clock()
+        days = {}
+        for m in members:
+            days[m["wallet"]] = {r[0] for r in self.db.execute(
+                "SELECT c.day FROM claims c JOIN sessions s ON s.id=c.session_id WHERE s.wallet=?", (m["wallet"],))}
+        def everyone(day: int) -> bool:
+            present = [m for m in members if m["joined_day"] <= day]
+            return bool(present) and all(day in days[m["wallet"]] for m in present)
+        d = today if everyone(today) else today - 1
+        streak = 0
+        while d >= min(m["joined_day"] for m in members) and everyone(d):
+            streak, d = streak + 1, d - 1
+        return {
+            "name": row["name"], "code": row["code"], "streak": streak,
+            "done_today": sum(today in days[m["wallet"]] for m in members), "size": len(members),
+            "members": [{
+                "wallet": m["wallet"], "you": m["wallet"] == wallet, "done_today": today in days[m["wallet"]],
+                "facedown_now": self.db.execute("SELECT 1 FROM sessions WHERE wallet=? AND state='ACTIVE' AND expires_at > ?",
+                                                (m["wallet"], now)).fetchone() is not None,
+            } for m in members],
+        }
+
     def live(self) -> dict:
         """How many sessions are running right now (authorized, not yet submitted, not expired)."""
         n = self.db.execute("SELECT COUNT(*) FROM sessions WHERE state='ACTIVE' AND expires_at > ?",

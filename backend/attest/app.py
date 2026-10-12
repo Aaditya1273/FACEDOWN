@@ -58,6 +58,16 @@ class Faucet(BaseModel):
     wallet: str
 
 
+class SquadCreate(BaseModel):
+    wallet: str
+    name: str = Field("Squad", max_length=40)
+
+
+class SquadJoin(BaseModel):
+    wallet: str
+    code: str = Field(min_length=6, max_length=6)
+
+
 class GenerateMission(BaseModel):
     prompt: str = Field(min_length=5, max_length=1000)
 
@@ -155,6 +165,18 @@ def create_app(service: Attest | None = None) -> FastAPI:
     @app.post("/streak/freeze/{order_id}")
     def freeze_pay(order_id: str, body: Authorize):
         return svc.freeze_pay(order_id, body.stake_transaction or "")
+
+    @app.post("/squads")
+    def squad_create(body: SquadCreate):
+        return svc.squad_create(body.wallet, body.name)
+
+    @app.post("/squads/join")
+    def squad_join(body: SquadJoin):
+        return svc.squad_join(body.wallet, body.code)
+
+    @app.get("/squads/{wallet}")
+    def squad(wallet: str):
+        return svc.squad(wallet)
 
     @app.get("/live")
     def live():

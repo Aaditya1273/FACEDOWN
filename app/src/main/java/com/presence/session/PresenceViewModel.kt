@@ -75,9 +75,10 @@ class PresenceViewModel @Inject constructor(
             val history = wallet.account?.let { runCatching { api.history(it.address) }.getOrNull() } ?: emptyList()
             val pools = runCatching { api.pools().missions }.getOrDefault(emptyMap())
             val live = runCatching { api.live().facedownNow }.getOrDefault(0)
+            val squad = wallet.account?.let { runCatching { api.squad(it.address) }.getOrNull() }
             _state.update { s ->
                 val selected = missions.firstOrNull { m -> m.missionId == s.mission?.missionId } ?: missions.firstOrNull()
-                s.copy(health = health, missions = missions, mission = selected, profile = profile, pools = pools, history = history, facedownNow = live,
+                s.copy(health = health, missions = missions, mission = selected, profile = profile, pools = pools, history = history, facedownNow = live, squad = squad,
                     backendError = null)
             }
         } catch (e: CancellationException) {
@@ -158,6 +159,22 @@ class PresenceViewModel @Inject constructor(
     fun endCalibration() {
         calibration?.cancel()
         _state.update { it.copy(screen = Screen.Home) }
+    }
+
+    fun createSquad(name: String) = squadAction { api.createSquad(it, name) }
+    fun joinSquad(code: String) = squadAction { api.joinSquad(it, code) }
+
+    private fun squadAction(call: suspend (String) -> com.presence.attest.Squad) = viewModelScope.launch {
+        val address = wallet.account?.address ?: return@launch
+        try {
+            val sq = call(address)
+            _state.update { it.copy(squad = sq) }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            val detail = (e as? AttestException)?.detail?.takeIf { it.isNotBlank() }
+            _state.update { it.copy(message = detail?.replaceFirstChar { c -> c.uppercase() } ?: reasonMessage("NETWORK_ERROR")) }
+        }
     }
 
     fun disconnect() {

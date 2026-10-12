@@ -73,6 +73,7 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.semantics.Role
 import com.presence.urge.Urges
+import androidx.compose.material3.OutlinedTextField
 import com.presence.PresenceMinutes
 import com.presence.ui.components.ProgressRing
 import androidx.compose.runtime.LaunchedEffect
@@ -97,8 +98,12 @@ fun HomeScreen(
     onRetry: () -> Unit,
     onBuyFreeze: () -> Unit = {},
     onCalibrate: () -> Unit = {},
+    onCreateSquad: (String) -> Unit = {},
+    onJoinSquad: (String) -> Unit = {},
 ) {
     var tab by rememberSaveable { mutableStateOf(Tab.Today) }
+    var shown by remember { mutableStateOf(false) }
+    LaunchedEffect(tab) { if (shown) onRetry() else shown = true } // fresh squad, pools and live count per tab
     Column(Modifier.fillMaxSize().background(SemanticColors.Canvas)) {
         AnimatedContent(tab, Modifier.weight(1f), label = "tab",
             transitionSpec = { fadeIn(tween(Motion.screen)) togetherWith fadeOut(tween(Motion.micro)) }) { t ->
@@ -108,7 +113,8 @@ fun HomeScreen(
                 }
                 when (t) {
                     Tab.Today -> Today(s, onConnect, onSelect, onOpen, onRetry)
-                    Tab.Progress -> Progress(s, onConnect = { tab = Tab.Profile }, onBuyFreeze = onBuyFreeze)
+                    Tab.Progress -> Progress(s, onConnect = { tab = Tab.Profile }, onBuyFreeze = onBuyFreeze,
+                        onCreateSquad = onCreateSquad, onJoinSquad = onJoinSquad)
                     Tab.Profile -> ProfileTab(s, onConnect, onDisconnect, onRetry, onCalibrate)
                 }
             }
@@ -279,6 +285,47 @@ private fun greeting(): String = when (java.util.Calendar.getInstance().get(java
     else -> "Good evening"
 }
 
+/** Squad: one shared streak. If anyone misses a day it breaks for everyone. */
+@Composable
+private fun SquadSection(squad: com.presence.attest.Squad?, onCreate: (String) -> Unit, onJoin: (String) -> Unit) {
+    val ctx = LocalContext.current
+    SectionLabel("Squad")
+    Gap(8)
+    if (squad == null) {
+        var code by remember { mutableStateOf("") }
+        Text("3 to 8 friends, one shared streak. If anyone misses a day, it breaks for everyone.",
+            style = MaterialTheme.typography.bodyMedium, color = SemanticColors.SecondaryText)
+        Gap(8)
+        PrimaryButton("Start a squad") { onCreate("My squad") }
+        Gap(8)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            OutlinedTextField(code, { code = it.uppercase().take(6) }, Modifier.weight(1f), singleLine = true,
+                label = { Text("Invite code") })
+            Spacer(Modifier.size(Spacing.related))
+            TextAction("Join") { if (code.length == 6) onJoin(code) }
+        }
+        return
+    }
+    Group {
+        KeyValue("Squad streak", if (squad.streak == 1) "1 day" else "${squad.streak} days", BrandColors.Green)
+        Hairline()
+        KeyValue("Done today", "${squad.doneToday} of ${squad.size}")
+        squad.members.forEach { m ->
+            Hairline()
+            KeyValue(if (m.you) "You" else shortAddress(m.wallet), when {
+                m.facedownNow -> "Facedown now"
+                m.doneToday -> "Done today"
+                else -> "Not yet"
+            }, if (m.facedownNow || m.doneToday) BrandColors.Green else SemanticColors.TertiaryText)
+        }
+    }
+    Gap(8)
+    TextAction("Invite with code ${squad.code}") {
+        ctx.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT,
+            "Join my FACEDOWN squad: code ${squad.code}. One shared streak, so don't break it."), "Invite"))
+    }
+}
+
 /** Today's Presence Minutes against the daily goal; opt-in, because it samples the sensor all day. */
 @Composable
 private fun PresenceRing() {
@@ -399,7 +446,8 @@ private fun WeekDots(p: Profile) = Row(horizontalArrangement = Arrangement.space
 
 @Composable
 private fun androidx.compose.foundation.layout.ColumnScope.Progress(s: UiState, onConnect: () -> Unit,
-                                                                    onBuyFreeze: () -> Unit) {
+                                                                    onBuyFreeze: () -> Unit, onCreateSquad: (String) -> Unit,
+                                                                    onJoinSquad: (String) -> Unit) {
     Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
         Gap(16)
         Text("Progress", style = MaterialTheme.typography.headlineLarge, color = SemanticColors.PrimaryText)
@@ -416,6 +464,8 @@ private fun androidx.compose.foundation.layout.ColumnScope.Progress(s: UiState, 
             Figure("Best streak", "${p.bestStreak}", Modifier.weight(1f))
             Figure("Verified", "${p.verifiedCount}", Modifier.weight(1f))
         }
+        Gap(24)
+        SquadSection(s.squad, onCreateSquad, onJoinSquad)
         Gap(24)
         Group {
             KeyValue("Streak freezes", "${p.streakFreezes}")

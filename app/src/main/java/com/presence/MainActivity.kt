@@ -126,7 +126,8 @@ fun ClockInRoot(sender: ActivityResultSender, pendingMission: MutableState<Strin
             when (screen) {
                 Screen.Home -> HomeScreen(s, onConnect = { vm.connect(sender) }, onSelect = vm::select,
                     onOpen = vm::openMission, onDisconnect = vm::disconnect, onRetry = { vm.refresh() },
-                    onBuyFreeze = { vm.buyFreeze(sender) }, onCalibrate = vm::calibrate)
+                    onBuyFreeze = { vm.buyFreeze(sender) }, onCalibrate = vm::calibrate,
+                    onCreateSquad = vm::createSquad, onJoinSquad = vm::joinSquad)
                 Screen.Mission -> MissionScreen(s, onBack = vm::home, onStart = { vm.startMission(sender) })
                 is Screen.Countdown -> CountdownScreen(screen.seconds)
                 is Screen.Active -> ActiveScreen(screen, s.facedownNow, onPulse = vm::onPulse, onBuzz = vm::onBuzz)

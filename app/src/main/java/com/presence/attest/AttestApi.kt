@@ -94,6 +94,14 @@ data class Profile(
 )
 
 @Serializable
+data class SquadMember(val wallet: String, val you: Boolean = false, @SerialName("done_today") val doneToday: Boolean = false,
+                       @SerialName("facedown_now") val facedownNow: Boolean = false)
+
+@Serializable
+data class Squad(val name: String, val code: String, val streak: Int, @SerialName("done_today") val doneToday: Int,
+                 val size: Int, val members: List<SquadMember>)
+
+@Serializable
 data class FreezeOrder(@SerialName("order_id") val orderId: String, val transaction: String, val price: Double,
                        val burn: Double, val symbol: String)
 
@@ -183,6 +191,10 @@ class AttestApi @Inject constructor(@PublishedApi internal val http: HttpClient)
     suspend fun pools(): Pools = get("/sponsor/pools")
 
     /** DEVELOPMENT ONLY (server refuses on mainnet): fee SOL + test tokens for a new test wallet. */
+    suspend fun squad(wallet: String): Squad? = get("/squads/$wallet")
+    suspend fun createSquad(wallet: String, name: String): Squad = post("/squads", mapOf("wallet" to wallet, "name" to name))
+    suspend fun joinSquad(wallet: String, code: String): Squad = post("/squads/join", mapOf("wallet" to wallet, "code" to code))
+
     suspend fun freezeOrder(wallet: String): FreezeOrder = post("/streak/freeze", mapOf("wallet" to wallet))
     suspend fun freezePay(orderId: String, signedTxB64: String): FreezePaid =
         post("/streak/freeze/$orderId", mapOf("signature" to "-", "stake_transaction" to signedTxB64))

@@ -52,6 +52,7 @@ data class UiState(
     val history: List<com.presence.attest.HistoryItem> = emptyList(),
     /** The user's calibrated knock threshold (m/s^2), or null if never calibrated. */
     val knockThreshold: Float? = null,
+    val squad: com.presence.attest.Squad? = null,
     /** Sessions running on the server right now, including yours. */
     val facedownNow: Int = 0,
     val busy: Boolean = false,
